@@ -2,9 +2,9 @@
 
 ## Scope
 
-This builder **only** supports kernels from:
+This builder **only** uses:
 
-`https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250`
+**[HELLBOY017/kernel_oneplus_sm8250](https://github.com/HELLBOY017/kernel_oneplus_sm8250)**
 
 | Device | SoC | Notes |
 |--------|-----|--------|
@@ -13,28 +13,21 @@ This builder **only** supports kernels from:
 | OnePlus 8T | SM8250 | codename `kebab` |
 | OnePlus 9R | SM8250-AC | codename `lemonades` |
 
-**Not supported:** OnePlus 9/9 Pro (SM8350), OP7 series, OP10+ GKI devices.
+**Not supported:** other kernel trees (LineageOS, OnePlusOSS, Realking, …), OnePlus 9/9 Pro (SM8350), OP7 series, OP10+ GKI devices.
+
+Default: branch **`14`**, defconfig **`vendor/oplus-stock_defconfig`**.
 
 ---
 
-## Branch ↔ ROM guide
+## Branch guide (HELLBOY)
 
-Pick the OSS branch that matches **your device + stock Android/OOS generation**.
+| Branch | Typical use |
+|--------|-------------|
+| **`14`** | **Default** — stock-oriented CLO; STOCK verified |
+| `13.1` | Optional older tip (`kernel_branch_override`) |
+| `oos` | Older OOS-oriented tip (verify before use) |
 
-| Branch | Android | Typical devices |
-|--------|---------|-----------------|
-| `oneplus/SM8250_Q_10.0` | 10 | OP8, OP8 Pro |
-| `oneplus/SM8250_R_11.0` | 11 | OP8, OP8 Pro, OP8T |
-| `oneplus/SM8250_R_11.0_9R` | 11 | OP9R |
-| `oneplus/sm8250_s_12.1` | 12 | OP8 series |
-| `oneplus/sm8250_t_13.0.0_op8` | 13.0 | OP8, OP8 Pro, OP8T |
-| `oneplus/sm8250_t_13.0.0_op9r` | 13.0 | OP9R |
-| `oneplus/sm8250_t_13.1_op8` | 13.1 | OP8 class |
-| `oneplus/sm8250_t_13.1_op9r` | 13.1 | OP9R |
-| `oneplus/sm8250_u_14.0.0_op8t` | 14 | **OP8T** |
-| `oneplus/sm8250_u_14.0.0_op9r` | 14 | **OP9R** |
-
-There is **no** dedicated `u_14` dump for non-T OP8 in OnePlusOSS — OP8/OP8 Pro often stay on **T 13.1** trees for last official sources.
+Override via workflow `kernel_branch_override` or `configs/build-request.json`.
 
 ---
 
@@ -42,7 +35,7 @@ There is **no** dedicated `u_14` dump for non-T OP8 in OnePlusOSS — OP8/OP8 Pr
 
 | Mode | Root | SUSFS | Use |
 |------|------|-------|-----|
-| `STOCK` | No | No | Baseline / debug pure tree |
+| `STOCK` | No | No | Baseline / pure tree |
 | `KSUN` | KernelSU-Next | No | Root without SUSFS |
 | `KSUN_SUSFS` | KernelSU-Next | Yes (`kernel-4.19`) | Root + hide stack |
 
@@ -50,9 +43,9 @@ There is **no** dedicated `u_14` dump for non-T OP8 in OnePlusOSS — OP8/OP8 Pr
 
 ## Important warnings
 
-1. **Stock ROM oriented** — official dumps target OxygenOS-class trees. Custom ROMs may need different sources (e.g. Lineage).
+1. **HELLBOY-only** — not an official OnePlus dump; stock-oriented community CLO tree.
 2. **Non-GKI 4.19** — no LKM install; every change needs a full kernel rebuild.
-3. **SUSFS patches often need reject fixes** on OEM trees — first boots may need patch iteration.
+3. **SUSFS patches** may need reject fixes on OEM/community trees — first boots may need patch iteration.
 4. **Unlocked bootloader**; disable verification when required.
 5. **OTA** may replace your kernel — re-flash after major updates.
 6. Always keep a **stock boot** backup.
@@ -66,6 +59,7 @@ There is **no** dedicated `u_14` dump for non-T OP8 in OnePlusOSS — OP8/OP8 Pr
 
 ---
 
-## Cross-device
+## Cross-device / other branches
 
-Flashing this kernel on non–OP8-series hardware is **unsupported**. SM8250 ≠ modern GKI KMI matching used by OP10+.
+- Flashing this kernel on non–OP8-series hardware is **unsupported**.
+- Develop only on **`op8series-sm8250-ksu-susfs`**. Treat **`main`** as read-only reference (GKI pipeline).
