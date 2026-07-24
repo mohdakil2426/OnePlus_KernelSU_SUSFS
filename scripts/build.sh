@@ -156,28 +156,32 @@ else
   endgroup
 fi
 
-# HELLBOY017 / dual touch: generic Synaptics TCM + Oplus Syna oncell both export
-# response_complete → ld.lld duplicate symbol at vmlinux. Prefer Oplus panel stack.
-log "Resolve Synaptics TCM duplicate symbols if both drivers enabled"
+# Community OP8 trees often enable BOTH generic Synaptics (dsx/tcm) and Oplus
+# touch panel stacks → link errors (response_complete, active_panel). Keep Oplus.
+log "Disable generic Synaptics touch (keep Oplus touchscreen stack)"
 if [[ -f out/.config ]]; then
-  if grep -qE '^CONFIG_TOUCHPANEL_OPLUS=y|^CONFIG_TOUCHPANEL_SYNAPTICS=y' out/.config 2>/dev/null \
-     || grep -q 'oplus_touchscreen' out/.config 2>/dev/null; then
-    for opt in \
-      TOUCHSCREEN_SYNAPTICS_TCM \
-      TOUCHSCREEN_SYNAPTICS_TCM_CORE \
-      TOUCHSCREEN_SYNAPTICS_TCM_SPI \
-      TOUCHSCREEN_SYNAPTICS_TCM_I2C \
-      TOUCHSCREEN_SYNAPTICS_DSX_CORE \
-      TOUCHSCREEN_SYNAPTICS_DSX_I2C
-    do
-      ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
-    done
-  fi
-  # Also drop generic TCM if both objects would still link (defconfig force)
-  if grep -q 'synaptics_tcm' drivers/input/touchscreen/Makefile 2>/dev/null; then
-    ./scripts/config --file out/.config -d TOUCHSCREEN_SYNAPTICS_TCM 2>/dev/null || true
-    ./scripts/config --file out/.config -d TOUCHSCREEN_SYNAPTICS_TCM_CORE 2>/dev/null || true
-  fi
+  while IFS= read -r line; do
+    opt="${line#CONFIG_}"
+    opt="${opt%%=*}"
+    [[ -z "$opt" ]] && continue
+    ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
+  done < <(grep -E '^CONFIG_TOUCHSCREEN_SYNAPTICS' out/.config || true)
+  # Common names even if not yet expanded in .config
+  for opt in \
+    TOUCHSCREEN_SYNAPTICS_TCM \
+    TOUCHSCREEN_SYNAPTICS_TCM_CORE \
+    TOUCHSCREEN_SYNAPTICS_TCM_SPI \
+    TOUCHSCREEN_SYNAPTICS_TCM_I2C \
+    TOUCHSCREEN_SYNAPTICS_DSX \
+    TOUCHSCREEN_SYNAPTICS_DSX_CORE \
+    TOUCHSCREEN_SYNAPTICS_DSX_I2C \
+    TOUCHSCREEN_SYNAPTICS_DSX_SPI \
+    TOUCHSCREEN_SYNAPTICS_DSX_RMI_HID_I2C \
+    TOUCHSCREEN_SYNAPTICS_I2C_RMI4
+  do
+    ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
+  done
+  grep -E 'SYNAPTICS|TOUCHPANEL' out/.config | head -40 || true
 fi
 endgroup
 

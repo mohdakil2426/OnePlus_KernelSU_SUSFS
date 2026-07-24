@@ -1,5 +1,5 @@
 {
-  "source_presets": ["HELLBOY017", "REALKING"],
+  "source_presets": ["HELLBOY017"],
   "build_mode": "STOCK",
   "device_profile": "ALL_OP8_SERIES",
   "ksun_ref": "next",
