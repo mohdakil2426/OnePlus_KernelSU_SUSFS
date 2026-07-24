@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # OnePlus 8 series (SM8250) kernel build orchestrator.
-# Supports selectable sources (HELLBOY017, REALKING, LineageOS, OnePlusOSS, …).
+# Supports selectable sources (HELLBOY017 primary; LineageOS / OnePlusOSS optional).
 #
 # Required env:
 #   KERNEL_BRANCH   git branch of KERNEL_SOURCE

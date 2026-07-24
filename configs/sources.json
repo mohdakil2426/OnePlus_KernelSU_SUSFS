@@ -6,25 +6,7 @@
     "defconfig": "vendor/oplus-stock_defconfig",
     "run_oplus_stubs": true,
     "disable_proprietary_oplus_configs": false,
-    "notes": "Community default for OP8 KSUN builders. Complete-ish CLO tree. Branch 14 + oplus-stock_defconfig."
-  },
-  "REALKING": {
-    "label": "Realking SM8250 (claims OOS + AOSP)",
-    "kernel_source": "https://github.com/Rohail33/Realking_kernel_sm8250.git",
-    "kernel_branch": "opkona",
-    "defconfig": "vendor/oplus-stock_defconfig",
-    "run_oplus_stubs": true,
-    "disable_proprietary_oplus_configs": false,
-    "notes": "Use opkona for stable OP builds. op-staging is WIP (compile breaks: cs_target/shrinker_rwsem). Override branch to op-staging if testing."
-  },
-  "ONEPLUS_OSS": {
-    "label": "OnePlusOSS official (incomplete — experimental)",
-    "kernel_source": "https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250.git",
-    "kernel_branch": "oneplus/sm8250_u_14.0.0_op8t",
-    "defconfig": "vendor/kona-perf_defconfig",
-    "run_oplus_stubs": true,
-    "disable_proprietary_oplus_configs": true,
-    "notes": "Broken vendor/oplus symlinks; not recommended as default."
+    "notes": "Primary OP8 series source. Branch 14 + oplus-stock_defconfig. STOCK build verified."
   },
   "LINEAGEOS": {
     "label": "LineageOS official (custom ROM)",
@@ -34,5 +16,14 @@
     "run_oplus_stubs": true,
     "disable_proprietary_oplus_configs": false,
     "notes": "For LineageOS ROMs. Verify defconfig on branch if build fails."
+  },
+  "ONEPLUS_OSS": {
+    "label": "OnePlusOSS official (incomplete — experimental)",
+    "kernel_source": "https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250.git",
+    "kernel_branch": "oneplus/sm8250_u_14.0.0_op8t",
+    "defconfig": "vendor/kona-perf_defconfig",
+    "run_oplus_stubs": true,
+    "disable_proprietary_oplus_configs": true,
+    "notes": "Broken vendor/oplus symlinks; not recommended."
   }
 }

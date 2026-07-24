@@ -39,7 +39,7 @@ This branch is **not** for OP10+ GKI devices. Those belong on the multi-device W
 
 | Input | Purpose |
 |-------|---------|
-| `source_preset` | **HELLBOY017** / **REALKING** / BOTH / LINEAGEOS / ONEPLUS_OSS |
+| `source_preset` | **HELLBOY017** (primary) / LINEAGEOS / ONEPLUS_OSS |
 | `build_mode` | `STOCK` / `KSUN` / `KSUN_SUSFS` |
 | `device_profile` | AnyKernel device check filter |
 | `kernel_branch_override` | Optional branch override |
@@ -51,8 +51,7 @@ This branch is **not** for OP10+ GKI devices. Those belong on the multi-device W
 
 | Preset | Best for | Default branch / defconfig |
 |--------|----------|----------------------------|
-| **HELLBOY017** | Stock-oriented CLO (recommended) | `14` / `vendor/oplus-stock_defconfig` |
-| **REALKING** | CLO; claims OOS + AOSP | `op-staging` / `vendor/oplus-stock_defconfig` |
+| **HELLBOY017** | Stock-oriented CLO (**primary**, STOCK verified) | `14` / `vendor/oplus-stock_defconfig` |
 | **LINEAGEOS** | LineageOS ROMs | `lineage-23.2` |
 | **ONEPLUS_OSS** | Experimental only (incomplete) | OnePlus official dump |
 

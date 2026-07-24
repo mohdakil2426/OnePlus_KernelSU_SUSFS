@@ -2,7 +2,7 @@ name: Build OP8 Series Kernel (SM8250)
 
 # Branch: op8series-sm8250-ksu-susfs
 # - push on configs/build-request.json / scripts / this workflow → matrix from JSON
-# - workflow_dispatch → select one source preset (or BOTH HELLBOY+REALKING)
+# - workflow_dispatch → select source preset (HELLBOY017 primary)
 
 permissions:
   contents: write
@@ -19,14 +19,12 @@ on:
   workflow_dispatch:
     inputs:
       source_preset:
-        description: 'Kernel source (HELLBOY017 / REALKING recommended for stock)'
+        description: 'Kernel source (HELLBOY017 = primary stock CLO)'
         required: true
         type: choice
         default: 'HELLBOY017'
         options:
           - HELLBOY017
-          - REALKING
-          - BOTH_HELLBOY_REALKING
           - LINEAGEOS
           - ONEPLUS_OSS
       build_mode:
@@ -112,12 +110,7 @@ jobs:
             PRESET="${{ inputs.source_preset }}"
             BR_OVR="${{ inputs.kernel_branch_override }}"
             DC_OVR="${{ inputs.defconfig_override }}"
-
-            if [ "$PRESET" = "BOTH_HELLBOY_REALKING" ]; then
-              PRESETS='["HELLBOY017","REALKING"]'
-            else
-              PRESETS=$(jq -cn --arg p "$PRESET" '[$p]')
-            fi
+            PRESETS=$(jq -cn --arg p "$PRESET" '[$p]')
           else
             MODE=$(jq -r '.build_mode // "STOCK"' configs/build-request.json)
             DEV=$(jq -r '.device_profile // "ALL_OP8_SERIES"' configs/build-request.json)
