@@ -156,6 +156,31 @@ else
   endgroup
 fi
 
+# HELLBOY017 / dual touch: generic Synaptics TCM + Oplus Syna oncell both export
+# response_complete → ld.lld duplicate symbol at vmlinux. Prefer Oplus panel stack.
+log "Resolve Synaptics TCM duplicate symbols if both drivers enabled"
+if [[ -f out/.config ]]; then
+  if grep -qE '^CONFIG_TOUCHPANEL_OPLUS=y|^CONFIG_TOUCHPANEL_SYNAPTICS=y' out/.config 2>/dev/null \
+     || grep -q 'oplus_touchscreen' out/.config 2>/dev/null; then
+    for opt in \
+      TOUCHSCREEN_SYNAPTICS_TCM \
+      TOUCHSCREEN_SYNAPTICS_TCM_CORE \
+      TOUCHSCREEN_SYNAPTICS_TCM_SPI \
+      TOUCHSCREEN_SYNAPTICS_TCM_I2C \
+      TOUCHSCREEN_SYNAPTICS_DSX_CORE \
+      TOUCHSCREEN_SYNAPTICS_DSX_I2C
+    do
+      ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
+    done
+  fi
+  # Also drop generic TCM if both objects would still link (defconfig force)
+  if grep -q 'synaptics_tcm' drivers/input/touchscreen/Makefile 2>/dev/null; then
+    ./scripts/config --file out/.config -d TOUCHSCREEN_SYNAPTICS_TCM 2>/dev/null || true
+    ./scripts/config --file out/.config -d TOUCHSCREEN_SYNAPTICS_TCM_CORE 2>/dev/null || true
+  fi
+fi
+endgroup
+
 # Re-open configure group for remaining config tweaks
 log "Apply optional KSU/SUSFS config symbols"
 if [[ "$ENABLE_KSUN" == "true" ]]; then

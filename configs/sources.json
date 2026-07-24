@@ -11,11 +11,11 @@
   "REALKING": {
     "label": "Realking SM8250 (claims OOS + AOSP)",
     "kernel_source": "https://github.com/Rohail33/Realking_kernel_sm8250.git",
-    "kernel_branch": "op-staging",
+    "kernel_branch": "opkona",
     "defconfig": "vendor/oplus-stock_defconfig",
     "run_oplus_stubs": true,
     "disable_proprietary_oplus_configs": false,
-    "notes": "Active CLO tree; op-staging for OnePlus. Alt branch: opkona. Defconfig: oplus-stock or kona-perf."
+    "notes": "Use opkona for stable OP builds. op-staging is WIP (compile breaks: cs_target/shrinker_rwsem). Override branch to op-staging if testing."
   },
   "ONEPLUS_OSS": {
     "label": "OnePlusOSS official (incomplete — experimental)",
