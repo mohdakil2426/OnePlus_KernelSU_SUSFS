@@ -1,30 +1,32 @@
 #!/usr/bin/env bash
 # OnePlus 8 series (SM8250) kernel build orchestrator.
-# Only supports OnePlusOSS/android_kernel_oneplus_sm8250
+# Supports selectable sources (HELLBOY017, REALKING, LineageOS, OnePlusOSS, …).
 #
 # Required env:
-#   KERNEL_BRANCH   e.g. oneplus/sm8250_u_14.0.0_op8t
+#   KERNEL_BRANCH   git branch of KERNEL_SOURCE
 #   BUILD_MODE      STOCK | KSUN | KSUN_SUSFS
 # Optional:
-#   KERNEL_SOURCE   default OnePlusOSS sm8250 URL
-#   DEFCONFIG       default vendor/kona-perf_defconfig
+#   KERNEL_SOURCE   git URL (default HELLBOY017)
+#   DEFCONFIG       default vendor/oplus-stock_defconfig
 #   DEVICE_PROFILE  ALL_OP8_SERIES | OP8 | OP8Pro | OP8T | OP9R
-#   KSUN_REF        default next
-#   SUSFS_REF       default kernel-4.19
-#   JOBS            default nproc
-#   ARTIFACT_DIR    default $PWD/artifacts
-#   WORK_DIR        default $PWD/work
+#   SOURCE_PRESET   label for artifacts (e.g. HELLBOY017)
+#   RUN_OPLUS_STUBS true|false (default true)
+#   DISABLE_PROPRIETARY_OPLUS_CONFIGS true|false (default false)
+#   KSUN_REF / SUSFS_REF / JOBS / ARTIFACT_DIR / WORK_DIR
 
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="$ROOT_DIR/scripts"
 
-KERNEL_SOURCE="${KERNEL_SOURCE:-https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250.git}"
+KERNEL_SOURCE="${KERNEL_SOURCE:-https://github.com/HELLBOY017/kernel_oneplus_sm8250.git}"
 KERNEL_BRANCH="${KERNEL_BRANCH:?KERNEL_BRANCH is required}"
 BUILD_MODE="${BUILD_MODE:?BUILD_MODE is required}"
-DEFCONFIG="${DEFCONFIG:-vendor/kona-perf_defconfig}"
+DEFCONFIG="${DEFCONFIG:-vendor/oplus-stock_defconfig}"
 DEVICE_PROFILE="${DEVICE_PROFILE:-ALL_OP8_SERIES}"
+SOURCE_PRESET="${SOURCE_PRESET:-custom}"
+RUN_OPLUS_STUBS="${RUN_OPLUS_STUBS:-true}"
+DISABLE_PROPRIETARY_OPLUS_CONFIGS="${DISABLE_PROPRIETARY_OPLUS_CONFIGS:-false}"
 KSUN_REF="${KSUN_REF:-next}"
 SUSFS_REF="${SUSFS_REF:-kernel-4.19}"
 JOBS="${JOBS:-$(nproc)}"
@@ -50,10 +52,14 @@ rm -rf "$KERNEL_DIR"
 git clone --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_SOURCE" "$KERNEL_DIR"
 endgroup
 
-# OnePlusOSS dumps: broken vendor/oplus symlinks (sched_assist, etc.)
-log "Fix incomplete OSS vendor symlinks / missing Kconfigs"
-( cd "$KERNEL_DIR" && bash "$SCRIPT_DIR/fix-oplus-stubs.sh" )
-endgroup
+if [[ "$RUN_OPLUS_STUBS" == "true" ]]; then
+  log "Fix incomplete OSS vendor symlinks / missing Kconfigs"
+  ( cd "$KERNEL_DIR" && bash "$SCRIPT_DIR/fix-oplus-stubs.sh" )
+  endgroup
+else
+  log "Skipping oplus stubs (RUN_OPLUS_STUBS=$RUN_OPLUS_STUBS)"
+  endgroup
+fi
 
 # vDSO clang fix (common on 4.19 + modern clang)
 log "vDSO clang compatibility"
@@ -118,37 +124,37 @@ fi
 
 make "${MAKE_ARGS[@]}" "$DEFCONFIG"
 
-# OnePlusOSS dumps enable many OPLUS_* options that depend on unpublished
-# vendor trees (sched_assist headers, charger, touch, etc.). For a pure
-# public-source Image build, disable those options so compile can proceed.
-log "Disable proprietary OPLUS configs missing from public OSS"
-if [[ -f out/.config ]]; then
-  # Named known offenders first
-  for opt in \
-    LOCKING_PROTECT \
-    OPLUS_LOCKING_STRATEGY \
-    OPLUS_LOCKING_OSQ \
-    OPLUS_LOCKING_MONITOR \
-    OPLUS_SCHED \
-    OPLUS_CTP \
-    TOUCHPANEL_OPLUS \
-    OPLUS_TP_APK \
-    OPLUS_FW_UPDATE \
-    OPLUS_SM8250_CHARGER \
-    OPLUS_CHIP_SOC_NODE \
-    OPLUS_FEATURE_UID_PERF
-  do
-    ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
-  done
-  # Sweep: any still-enabled CONFIG_OPLUS_* from defconfig C-style ifdefs
-  while IFS= read -r line; do
-    opt="${line#CONFIG_}"
-    opt="${opt%%=*}"
-    [[ -z "$opt" ]] && continue
-    ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
-  done < <(grep -E '^CONFIG_OPLUS[A-Z0-9_]*=' out/.config || true)
+if [[ "$DISABLE_PROPRIETARY_OPLUS_CONFIGS" == "true" ]]; then
+  log "Disable proprietary OPLUS configs (incomplete OSS trees)"
+  if [[ -f out/.config ]]; then
+    for opt in \
+      LOCKING_PROTECT \
+      OPLUS_LOCKING_STRATEGY \
+      OPLUS_LOCKING_OSQ \
+      OPLUS_LOCKING_MONITOR \
+      OPLUS_SCHED \
+      OPLUS_CTP \
+      TOUCHPANEL_OPLUS \
+      OPLUS_TP_APK \
+      OPLUS_FW_UPDATE \
+      OPLUS_SM8250_CHARGER \
+      OPLUS_CHIP_SOC_NODE \
+      OPLUS_FEATURE_UID_PERF
+    do
+      ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
+    done
+    while IFS= read -r line; do
+      opt="${line#CONFIG_}"
+      opt="${opt%%=*}"
+      [[ -z "$opt" ]] && continue
+      ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
+    done < <(grep -E '^CONFIG_OPLUS[A-Z0-9_]*=' out/.config || true)
+  fi
+  endgroup
+else
+  log "Keeping OPLUS configs (community tree)"
+  endgroup
 fi
-endgroup
 
 # Re-open configure group for remaining config tweaks
 log "Apply optional KSU/SUSFS config symbols"
@@ -205,8 +211,9 @@ PATCHLEVEL=$(grep '^PATCHLEVEL *=' Makefile | awk '{print $3}')
 SUBLEVEL=$(grep '^SUBLEVEL *=' Makefile | awk '{print $3}')
 FULL_KVER="$VERSION.$PATCHLEVEL.$SUBLEVEL"
 BRANCH_SAFE="${KERNEL_BRANCH//\//_}"
+PRESET_SAFE="${SOURCE_PRESET//\//_}"
 STAMP="$(date -u +%Y%m%d_%H%M%S)"
-ZIP_NAME="OP8Series_${BUILD_MODE}_${BRANCH_SAFE}_${FULL_KVER}_${STAMP}.zip"
+ZIP_NAME="OP8Series_${PRESET_SAFE}_${BUILD_MODE}_${BRANCH_SAFE}_${FULL_KVER}_${STAMP}.zip"
 
 log "Package AnyKernel3"
 export KERNEL_DIR OUT_DIR="$KERNEL_DIR/out" ZIP_NAME DEVICE_PROFILE ARTIFACT_DIR
@@ -214,6 +221,7 @@ bash "$SCRIPT_DIR/package-anykernel.sh"
 endgroup
 
 {
+  echo "source_preset=$SOURCE_PRESET"
   echo "kernel_source=$KERNEL_SOURCE"
   echo "kernel_branch=$KERNEL_BRANCH"
   echo "build_mode=$BUILD_MODE"

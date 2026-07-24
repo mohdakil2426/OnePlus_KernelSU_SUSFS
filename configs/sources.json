@@ -1,0 +1,38 @@
+{
+  "HELLBOY017": {
+    "label": "HELLBOY017 Meteoric/CLO (stock-oriented)",
+    "kernel_source": "https://github.com/HELLBOY017/kernel_oneplus_sm8250.git",
+    "kernel_branch": "14",
+    "defconfig": "vendor/oplus-stock_defconfig",
+    "run_oplus_stubs": true,
+    "disable_proprietary_oplus_configs": false,
+    "notes": "Community default for OP8 KSUN builders. Complete-ish CLO tree. Branch 14 + oplus-stock_defconfig."
+  },
+  "REALKING": {
+    "label": "Realking SM8250 (claims OOS + AOSP)",
+    "kernel_source": "https://github.com/Rohail33/Realking_kernel_sm8250.git",
+    "kernel_branch": "op-staging",
+    "defconfig": "vendor/oplus-stock_defconfig",
+    "run_oplus_stubs": true,
+    "disable_proprietary_oplus_configs": false,
+    "notes": "Active CLO tree; op-staging for OnePlus. Alt branch: opkona. Defconfig: oplus-stock or kona-perf."
+  },
+  "ONEPLUS_OSS": {
+    "label": "OnePlusOSS official (incomplete — experimental)",
+    "kernel_source": "https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250.git",
+    "kernel_branch": "oneplus/sm8250_u_14.0.0_op8t",
+    "defconfig": "vendor/kona-perf_defconfig",
+    "run_oplus_stubs": true,
+    "disable_proprietary_oplus_configs": true,
+    "notes": "Broken vendor/oplus symlinks; not recommended as default."
+  },
+  "LINEAGEOS": {
+    "label": "LineageOS official (custom ROM)",
+    "kernel_source": "https://github.com/LineageOS/android_kernel_oneplus_sm8250.git",
+    "kernel_branch": "lineage-23.2",
+    "defconfig": "vendor/kona-perf_defconfig",
+    "run_oplus_stubs": true,
+    "disable_proprietary_oplus_configs": false,
+    "notes": "For LineageOS ROMs. Verify defconfig on branch if build fails."
+  }
+}

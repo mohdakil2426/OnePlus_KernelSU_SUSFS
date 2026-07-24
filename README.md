@@ -33,32 +33,32 @@ This branch is **not** for OP10+ GKI devices. Those belong on the multi-device W
 
 ## Build (GitHub Actions)
 
-1. Open **Actions** → **Build OP8 Series Kernel (SM8250)**
-2. **Run workflow**
+1. Open **Actions** → **Build OP8 Series Kernel (SM8250)** on branch `op8series-sm8250-ksu-susfs`
+2. **Run workflow** (or push `configs/build-request.json`)
 3. Choose:
 
 | Input | Purpose |
 |-------|---------|
-| `kernel_branch` | One of the 10 OnePlusOSS branches |
+| `source_preset` | **HELLBOY017** / **REALKING** / BOTH / LINEAGEOS / ONEPLUS_OSS |
 | `build_mode` | `STOCK` / `KSUN` / `KSUN_SUSFS` |
 | `device_profile` | AnyKernel device check filter |
-| `defconfig` | kona-perf (default) or kona |
-| `ksun_ref` | KernelSU-Next ref (default `next`) |
-| `susfs_ref` | SUSFS ref (default `kernel-4.19`) |
+| `kernel_branch_override` | Optional branch override |
+| `defconfig_override` | Optional defconfig override |
+| `ksun_ref` / `susfs_ref` | For root modes |
 | `make_release` | Publish a GitHub Release |
 
-Artifacts appear on the run page (and as a release if enabled).
+### Kernel sources (`configs/sources.json`)
 
-### Recommended branches
+| Preset | Best for | Default branch / defconfig |
+|--------|----------|----------------------------|
+| **HELLBOY017** | Stock-oriented CLO (recommended) | `14` / `vendor/oplus-stock_defconfig` |
+| **REALKING** | CLO; claims OOS + AOSP | `op-staging` / `vendor/oplus-stock_defconfig` |
+| **LINEAGEOS** | LineageOS ROMs | `lineage-23.2` |
+| **ONEPLUS_OSS** | Experimental only (incomplete) | OnePlus official dump |
 
-| Device + ROM | Branch |
-|--------------|--------|
-| OP8T on OOS 14 | `oneplus/sm8250_u_14.0.0_op8t` |
-| OP9R on OOS 14 | `oneplus/sm8250_u_14.0.0_op9r` |
-| OP8 / 8 Pro on OOS 13.1 | `oneplus/sm8250_t_13.1_op8` |
-| OP9R on OOS 13.1 | `oneplus/sm8250_t_13.1_op9r` |
+Push-based multi-build: set `source_presets` in [`configs/build-request.json`](configs/build-request.json).
 
-Full map: [`configs/registry.json`](configs/registry.json) and [`compatibility.md`](compatibility.md).
+See [`docs/reports/sm8250-community-kernel-sources-research.md`](docs/reports/sm8250-community-kernel-sources-research.md).
 
 ---
 

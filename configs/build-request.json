@@ -1,8 +1,7 @@
 {
-  "kernel_branch": "oneplus/sm8250_u_14.0.0_op8t",
+  "source_presets": ["HELLBOY017", "REALKING"],
   "build_mode": "STOCK",
   "device_profile": "ALL_OP8_SERIES",
-  "defconfig": "vendor/kona-perf_defconfig",
   "ksun_ref": "next",
   "susfs_ref": "kernel-4.19",
   "make_release": false,

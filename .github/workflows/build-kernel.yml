@@ -1,9 +1,8 @@
 name: Build OP8 Series Kernel (SM8250)
 
-# Runs on branch op8series-sm8250-ksu-susfs only.
-# - push: reads configs/build-request.json (used when branch is not default;
-#   workflow_dispatch from API requires workflow on default branch)
-# - workflow_dispatch: UI dropdowns (works once this branch is default, or workflow is on default)
+# Branch: op8series-sm8250-ksu-susfs
+# - push on configs/build-request.json / scripts / this workflow → matrix from JSON
+# - workflow_dispatch → select one source preset (or BOTH HELLBOY+REALKING)
 
 permissions:
   contents: write
@@ -14,28 +13,24 @@ on:
       - op8series-sm8250-ksu-susfs
     paths:
       - configs/build-request.json
+      - configs/sources.json
       - scripts/**
       - .github/workflows/build-kernel.yml
   workflow_dispatch:
     inputs:
-      kernel_branch:
-        description: 'OnePlusOSS sm8250 kernel branch'
+      source_preset:
+        description: 'Kernel source (HELLBOY017 / REALKING recommended for stock)'
         required: true
         type: choice
-        default: 'oneplus/sm8250_u_14.0.0_op8t'
+        default: 'HELLBOY017'
         options:
-          - oneplus/SM8250_Q_10.0
-          - oneplus/SM8250_R_11.0
-          - oneplus/SM8250_R_11.0_9R
-          - oneplus/sm8250_s_12.1
-          - oneplus/sm8250_t_13.0.0_op8
-          - oneplus/sm8250_t_13.0.0_op9r
-          - oneplus/sm8250_t_13.1_op8
-          - oneplus/sm8250_t_13.1_op9r
-          - oneplus/sm8250_u_14.0.0_op8t
-          - oneplus/sm8250_u_14.0.0_op9r
+          - HELLBOY017
+          - REALKING
+          - BOTH_HELLBOY_REALKING
+          - LINEAGEOS
+          - ONEPLUS_OSS
       build_mode:
-        description: 'STOCK = non-root | KSUN = KernelSU-Next | KSUN_SUSFS = KSUN + SUSFS'
+        description: 'STOCK = no root | KSUN | KSUN_SUSFS'
         required: true
         type: choice
         default: 'STOCK'
@@ -44,7 +39,7 @@ on:
           - KSUN
           - KSUN_SUSFS
       device_profile:
-        description: 'AnyKernel device check codenames'
+        description: 'AnyKernel device codenames'
         required: true
         type: choice
         default: 'ALL_OP8_SERIES'
@@ -54,94 +49,129 @@ on:
           - OP8Pro
           - OP8T
           - OP9R
-      defconfig:
-        description: 'Kernel defconfig'
-        required: true
-        type: choice
-        default: 'vendor/kona-perf_defconfig'
-        options:
-          - vendor/kona-perf_defconfig
-          - vendor/kona_defconfig
+      kernel_branch_override:
+        description: 'Optional branch override (empty = preset default)'
+        required: false
+        type: string
+        default: ''
+      defconfig_override:
+        description: 'Optional defconfig override (empty = preset default)'
+        required: false
+        type: string
+        default: ''
       ksun_ref:
-        description: 'KernelSU-Next git ref (branch/tag). Empty = next'
+        description: 'KernelSU-Next ref (KSUN modes)'
         required: false
         type: string
         default: 'next'
       susfs_ref:
-        description: 'SUSFS branch/tag (only for KSUN_SUSFS). Empty = kernel-4.19'
+        description: 'SUSFS ref (KSUN_SUSFS)'
         required: false
         type: string
         default: 'kernel-4.19'
       make_release:
-        description: 'Create GitHub Release with artifacts'
+        description: 'Create GitHub Release'
         required: true
         type: boolean
         default: false
       debug:
-        description: 'Upload build log on failure'
+        description: 'Upload logs on failure'
         required: false
         type: boolean
         default: true
 
-env:
-  KERNEL_SOURCE: https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250.git
-
 jobs:
   resolve:
-    name: Resolve build request
+    name: Resolve matrix
     runs-on: ubuntu-latest
     outputs:
-      kernel_branch: ${{ steps.r.outputs.kernel_branch }}
+      matrix: ${{ steps.r.outputs.matrix }}
       build_mode: ${{ steps.r.outputs.build_mode }}
       device_profile: ${{ steps.r.outputs.device_profile }}
-      defconfig: ${{ steps.r.outputs.defconfig }}
       ksun_ref: ${{ steps.r.outputs.ksun_ref }}
       susfs_ref: ${{ steps.r.outputs.susfs_ref }}
       make_release: ${{ steps.r.outputs.make_release }}
       debug: ${{ steps.r.outputs.debug }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Resolve inputs
+      - name: Build job matrix
         id: r
         shell: bash
         run: |
           set -euo pipefail
+          SOURCES=configs/sources.json
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "kernel_branch=${{ inputs.kernel_branch }}" >> "$GITHUB_OUTPUT"
-            echo "build_mode=${{ inputs.build_mode }}" >> "$GITHUB_OUTPUT"
-            echo "device_profile=${{ inputs.device_profile }}" >> "$GITHUB_OUTPUT"
-            echo "defconfig=${{ inputs.defconfig }}" >> "$GITHUB_OUTPUT"
-            echo "ksun_ref=${{ inputs.ksun_ref || 'next' }}" >> "$GITHUB_OUTPUT"
-            echo "susfs_ref=${{ inputs.susfs_ref || 'kernel-4.19' }}" >> "$GITHUB_OUTPUT"
-            echo "make_release=${{ inputs.make_release }}" >> "$GITHUB_OUTPUT"
-            echo "debug=${{ inputs.debug }}" >> "$GITHUB_OUTPUT"
+            MODE="${{ inputs.build_mode }}"
+            DEV="${{ inputs.device_profile }}"
+            KSUN="${{ inputs.ksun_ref || 'next' }}"
+            SUSFS="${{ inputs.susfs_ref || 'kernel-4.19' }}"
+            REL="${{ inputs.make_release }}"
+            DBG="${{ inputs.debug }}"
+            PRESET="${{ inputs.source_preset }}"
+            BR_OVR="${{ inputs.kernel_branch_override }}"
+            DC_OVR="${{ inputs.defconfig_override }}"
+
+            if [ "$PRESET" = "BOTH_HELLBOY_REALKING" ]; then
+              PRESETS='["HELLBOY017","REALKING"]'
+            else
+              PRESETS=$(jq -cn --arg p "$PRESET" '[$p]')
+            fi
           else
-            # push: configs/build-request.json on this branch
-            jq -r '
-              "kernel_branch=\(.kernel_branch)",
-              "build_mode=\(.build_mode)",
-              "device_profile=\(.device_profile)",
-              "defconfig=\(.defconfig)",
-              "ksun_ref=\(.ksun_ref // "next")",
-              "susfs_ref=\(.susfs_ref // "kernel-4.19")",
-              "make_release=\(.make_release // false)",
-              "debug=\(.debug // true)"
-            ' configs/build-request.json >> "$GITHUB_OUTPUT"
+            MODE=$(jq -r '.build_mode // "STOCK"' configs/build-request.json)
+            DEV=$(jq -r '.device_profile // "ALL_OP8_SERIES"' configs/build-request.json)
+            KSUN=$(jq -r '.ksun_ref // "next"' configs/build-request.json)
+            SUSFS=$(jq -r '.susfs_ref // "kernel-4.19"' configs/build-request.json)
+            REL=$(jq -r '.make_release // false' configs/build-request.json)
+            DBG=$(jq -r '.debug // true' configs/build-request.json)
+            BR_OVR=$(jq -r '.kernel_branch_override // ""' configs/build-request.json)
+            DC_OVR=$(jq -r '.defconfig_override // ""' configs/build-request.json)
+            PRESETS=$(jq -c '.source_presets // ["HELLBOY017"]' configs/build-request.json)
           fi
-          echo "Resolved:"
-          cat "$GITHUB_OUTPUT"
+
+          echo "build_mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "device_profile=$DEV" >> "$GITHUB_OUTPUT"
+          echo "ksun_ref=$KSUN" >> "$GITHUB_OUTPUT"
+          echo "susfs_ref=$SUSFS" >> "$GITHUB_OUTPUT"
+          echo "make_release=$REL" >> "$GITHUB_OUTPUT"
+          echo "debug=$DBG" >> "$GITHUB_OUTPUT"
+
+          # Expand presets → matrix include
+          MATRIX=$(jq -c \
+            --argjson presets "$PRESETS" \
+            --arg br_ovr "${BR_OVR:-}" \
+            --arg dc_ovr "${DC_OVR:-}" \
+            '
+            . as $S |
+            [ $presets[] as $p |
+              if ($S | has($p) | not) then error("Unknown source preset: \($p)") else . end |
+              $S[$p] |
+              {
+                preset: $p,
+                kernel_source: .kernel_source,
+                kernel_branch: (if $br_ovr != "" then $br_ovr else .kernel_branch end),
+                defconfig: (if $dc_ovr != "" then $dc_ovr else .defconfig end),
+                run_oplus_stubs: (.run_oplus_stubs // true | tostring),
+                disable_proprietary_oplus_configs: (.disable_proprietary_oplus_configs // false | tostring)
+              }
+            ] | {include: .}
+            ' "$SOURCES")
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "Resolved matrix:"
+          echo "$MATRIX" | jq .
 
   build:
-    name: ${{ needs.resolve.outputs.build_mode }} · ${{ needs.resolve.outputs.kernel_branch }}
+    name: ${{ needs.resolve.outputs.build_mode }} · ${{ matrix.preset }} · ${{ matrix.kernel_branch }}
     needs: resolve
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.resolve.outputs.matrix) }}
 
     steps:
-      - name: Checkout builder
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Disk cleanup
         uses: ./.github/actions/disk-cleanup
@@ -162,18 +192,17 @@ jobs:
           curl -fsSL \
             "https://github.com/ZyCromerZ/Clang/releases/download/14.0.6-20250704-release/Clang-14.0.6-20250704.tar.gz" \
             | tar -xzf - -C toolchains/clang
-          if [ ! -x toolchains/clang/bin/clang ]; then
-            nested=$(find toolchains/clang -maxdepth 3 -type f -name clang | head -1)
-            if [ -n "$nested" ]; then
-              root=$(dirname "$(dirname "$nested")")
-              echo "$root/bin" >> "$GITHUB_PATH"
-            fi
-          else
+          if [ -x toolchains/clang/bin/clang ]; then
             echo "$GITHUB_WORKSPACE/toolchains/clang/bin" >> "$GITHUB_PATH"
+          else
+            nested=$(find toolchains/clang -maxdepth 3 -type f -name clang | head -1 || true)
+            if [ -n "$nested" ]; then
+              echo "$(dirname "$(dirname "$nested")")/bin" >> "$GITHUB_PATH"
+            fi
           fi
-          clang --version | head -2
+          clang --version || true
 
-      - name: Setup AOSP GCC (aarch64 + arm)
+      - name: Setup AOSP GCC
         run: |
           set -euo pipefail
           git clone --depth=1 -b android12L-release \
@@ -185,19 +214,22 @@ jobs:
           echo "$GITHUB_WORKSPACE/toolchains/gcc64/bin" >> "$GITHUB_PATH"
           echo "$GITHUB_WORKSPACE/toolchains/gcc32/bin" >> "$GITHUB_PATH"
 
-      - name: Normalize script permissions
+      - name: Normalize scripts
         run: chmod +x scripts/*.sh
 
       - name: Build kernel
         id: build
         env:
-          KERNEL_SOURCE: ${{ env.KERNEL_SOURCE }}
-          KERNEL_BRANCH: ${{ needs.resolve.outputs.kernel_branch }}
+          KERNEL_SOURCE: ${{ matrix.kernel_source }}
+          KERNEL_BRANCH: ${{ matrix.kernel_branch }}
           BUILD_MODE: ${{ needs.resolve.outputs.build_mode }}
-          DEFCONFIG: ${{ needs.resolve.outputs.defconfig }}
+          DEFCONFIG: ${{ matrix.defconfig }}
           DEVICE_PROFILE: ${{ needs.resolve.outputs.device_profile }}
           KSUN_REF: ${{ needs.resolve.outputs.ksun_ref }}
           SUSFS_REF: ${{ needs.resolve.outputs.susfs_ref }}
+          RUN_OPLUS_STUBS: ${{ matrix.run_oplus_stubs }}
+          DISABLE_PROPRIETARY_OPLUS_CONFIGS: ${{ matrix.disable_proprietary_oplus_configs }}
+          SOURCE_PRESET: ${{ matrix.preset }}
           ARTIFACT_DIR: ${{ github.workspace }}/artifacts
           WORK_DIR: ${{ github.workspace }}/work
         run: bash scripts/build.sh
@@ -206,7 +238,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.build.outputs.zip_name || 'op8series-kernel' }}
+          name: ${{ matrix.preset }}-${{ needs.resolve.outputs.build_mode }}-${{ steps.build.outputs.zip_name || 'kernel' }}
           path: |
             artifacts/*.zip
             artifacts/Image
@@ -214,11 +246,11 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload build log on failure
+      - name: Upload failure logs
         if: failure() && needs.resolve.outputs.debug == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: build-log-failure
+          name: fail-${{ matrix.preset }}-${{ github.run_id }}
           path: |
             artifacts/build.log
             work/**/*.rej
@@ -229,23 +261,19 @@ jobs:
         if: success() && needs.resolve.outputs.make_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: op8series-${{ github.run_number }}
-          name: OP8 Series ${{ needs.resolve.outputs.build_mode }} — ${{ needs.resolve.outputs.kernel_branch }}
+          tag_name: op8series-${{ matrix.preset }}-${{ github.run_number }}
+          name: OP8 ${{ needs.resolve.outputs.build_mode }} · ${{ matrix.preset }} · ${{ matrix.kernel_branch }}
           body: |
-            ## OnePlus 8 Series Kernel (SM8250)
-
             | Field | Value |
             |-------|--------|
-            | Branch (git) | `op8series-sm8250-ksu-susfs` |
-            | Source | `OnePlusOSS/android_kernel_oneplus_sm8250` |
-            | Kernel branch | `${{ needs.resolve.outputs.kernel_branch }}` |
+            | Preset | `${{ matrix.preset }}` |
+            | Source | `${{ matrix.kernel_source }}` |
+            | Branch | `${{ matrix.kernel_branch }}` |
             | Mode | `${{ needs.resolve.outputs.build_mode }}` |
-            | Device profile | `${{ needs.resolve.outputs.device_profile }}` |
-            | Defconfig | `${{ needs.resolve.outputs.defconfig }}` |
+            | Defconfig | `${{ matrix.defconfig }}` |
             | Kernel | `${{ steps.build.outputs.kernel_version }}` |
           files: |
             artifacts/*.zip
             artifacts/build-info.txt
-          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
