@@ -92,4 +92,40 @@ while IFS= read -r line; do
   fi
 done < <(grep -RIn --include='*Kconfig*' -E '^[[:space:]]*source[[:space:]]' . 2>/dev/null | sed 's/^[^:]*:[0-9]*://' || true)
 
+# Common Oplus headers that core files include even when full sources are gone
+log "Writing common oplus header stubs"
+stub_headers=(
+  "include/linux/sched_assist/sched_assist_locking.h"
+  "include/linux/sched_assist/sched_assist_common.h"
+  "include/linux/sched_assist/sched_assist_slide.h"
+  "include/linux/sched_assist/sched_assist_workqueue.h"
+  "include/linux/healthinfo/fg.h"
+  "include/soc/oplus/healthinfo.h"
+  "include/soc/oplus/oplus_wakelock_profiler.h"
+  "include/soc/oplus/device_info.h"
+  "include/soc/oplus/lowmem_dbg.h"
+  "include/linux/task_cpustats.h"
+  "include/linux/task_sched_info.h"
+  "include/linux/process_mm_reclaim.h"
+  "include/linux/resmap_account.h"
+  "include/linux/reserve_area.h"
+  "include/linux/vm_anti_fragment.h"
+  "include/linux/memleak_stackdepot.h"
+  "drivers/gpu/msm/kgsl_reserve.h"
+  "arch/arm64/mm/arch_mmap.h"
+)
+for h in "${stub_headers[@]}"; do
+  if [[ ! -f "$h" ]] || [[ ! -s "$h" ]]; then
+    mkdir -p "$(dirname "$h")"
+    guard=$(echo "$h" | tr '/.-' '___' | tr '[:lower:]' '[:upper:]')
+    cat > "$h" << EOF
+/* Auto stub for incomplete OnePlusOSS public dump */
+#ifndef _STUB_${guard}_
+#define _STUB_${guard}_
+#endif
+EOF
+    log "Header stub: $h"
+  fi
+done
+
 log "Oplus/vendor stub fix complete"

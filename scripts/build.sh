@@ -118,6 +118,40 @@ fi
 
 make "${MAKE_ARGS[@]}" "$DEFCONFIG"
 
+# OnePlusOSS dumps enable many OPLUS_* options that depend on unpublished
+# vendor trees (sched_assist headers, charger, touch, etc.). For a pure
+# public-source Image build, disable those options so compile can proceed.
+log "Disable proprietary OPLUS configs missing from public OSS"
+if [[ -f out/.config ]]; then
+  # Named known offenders first
+  for opt in \
+    LOCKING_PROTECT \
+    OPLUS_LOCKING_STRATEGY \
+    OPLUS_LOCKING_OSQ \
+    OPLUS_LOCKING_MONITOR \
+    OPLUS_SCHED \
+    OPLUS_CTP \
+    TOUCHPANEL_OPLUS \
+    OPLUS_TP_APK \
+    OPLUS_FW_UPDATE \
+    OPLUS_SM8250_CHARGER \
+    OPLUS_CHIP_SOC_NODE \
+    OPLUS_FEATURE_UID_PERF
+  do
+    ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
+  done
+  # Sweep: any still-enabled CONFIG_OPLUS_* from defconfig C-style ifdefs
+  while IFS= read -r line; do
+    opt="${line#CONFIG_}"
+    opt="${opt%%=*}"
+    [[ -z "$opt" ]] && continue
+    ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
+  done < <(grep -E '^CONFIG_OPLUS[A-Z0-9_]*=' out/.config || true)
+fi
+endgroup
+
+# Re-open configure group for remaining config tweaks
+log "Apply optional KSU/SUSFS config symbols"
 if [[ "$ENABLE_KSUN" == "true" ]]; then
   ./scripts/config --file out/.config -e KSU || true
   ./scripts/config --file out/.config -e KALLSYMS || true
@@ -146,7 +180,8 @@ if [[ "$ENABLE_SUSFS" == "true" ]]; then
 fi
 
 make "${MAKE_ARGS[@]}" olddefconfig
-grep -E 'CONFIG_KSU|CONFIG_KSU_SUSFS' out/.config || true
+# Confirm critical symbols off/on
+grep -E 'CONFIG_LOCKING_PROTECT|CONFIG_KSU|CONFIG_OPLUS' out/.config | head -40 || true
 endgroup
 
 log "Compile Image (jobs=$JOBS)"
