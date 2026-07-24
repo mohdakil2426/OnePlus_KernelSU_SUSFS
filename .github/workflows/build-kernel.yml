@@ -1,32 +1,17 @@
 name: Build OP8 Series Kernel (SM8250)
 
-# Branch: op8series-sm8250-ksu-susfs
-# - push on configs/build-request.json / scripts / this workflow → matrix from JSON
-# - workflow_dispatch → select source preset (HELLBOY017 primary)
+# Branch: op8series-sm8250-ksu-susfs (HELLBOY017 kernel only)
+# Trigger: workflow_dispatch ONLY — same as main's build-kernel-release.yml
+#   (never push / schedule / PR automatic builds)
+# - main is reference-only; do not develop OP8 work there
+# ccache: author pattern from main (reference) — bucket "ccache-cache"
 
 permissions:
   contents: write
 
 on:
-  push:
-    branches:
-      - op8series-sm8250-ksu-susfs
-    paths:
-      - configs/build-request.json
-      - configs/sources.json
-      - scripts/**
-      - .github/workflows/build-kernel.yml
   workflow_dispatch:
     inputs:
-      source_preset:
-        description: 'Kernel source (HELLBOY017 = primary stock CLO)'
-        required: true
-        type: choice
-        default: 'HELLBOY017'
-        options:
-          - HELLBOY017
-          - LINEAGEOS
-          - ONEPLUS_OSS
       build_mode:
         description: 'STOCK = no root | KSUN | KSUN_SUSFS'
         required: true
@@ -67,13 +52,17 @@ on:
         required: false
         type: string
         default: 'kernel-4.19'
+      clean_build:
+        description: 'Clean build (no ccache)'
+        type: boolean
+        default: false
       make_release:
         description: 'Create GitHub Release'
         required: true
         type: boolean
         default: false
       debug:
-        description: 'Upload logs on failure'
+        description: 'Enable debug mode / upload logs on failure'
         required: false
         type: boolean
         default: true
@@ -88,6 +77,7 @@ jobs:
       device_profile: ${{ steps.r.outputs.device_profile }}
       ksun_ref: ${{ steps.r.outputs.ksun_ref }}
       susfs_ref: ${{ steps.r.outputs.susfs_ref }}
+      clean_build: ${{ steps.r.outputs.clean_build }}
       make_release: ${{ steps.r.outputs.make_release }}
       debug: ${{ steps.r.outputs.debug }}
     steps:
@@ -100,63 +90,92 @@ jobs:
           set -euo pipefail
           SOURCES=configs/sources.json
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            MODE="${{ inputs.build_mode }}"
-            DEV="${{ inputs.device_profile }}"
-            KSUN="${{ inputs.ksun_ref || 'next' }}"
-            SUSFS="${{ inputs.susfs_ref || 'kernel-4.19' }}"
-            REL="${{ inputs.make_release }}"
-            DBG="${{ inputs.debug }}"
-            PRESET="${{ inputs.source_preset }}"
-            BR_OVR="${{ inputs.kernel_branch_override }}"
-            DC_OVR="${{ inputs.defconfig_override }}"
-            PRESETS=$(jq -cn --arg p "$PRESET" '[$p]')
-          else
-            MODE=$(jq -r '.build_mode // "STOCK"' configs/build-request.json)
-            DEV=$(jq -r '.device_profile // "ALL_OP8_SERIES"' configs/build-request.json)
-            KSUN=$(jq -r '.ksun_ref // "next"' configs/build-request.json)
-            SUSFS=$(jq -r '.susfs_ref // "kernel-4.19"' configs/build-request.json)
-            REL=$(jq -r '.make_release // false' configs/build-request.json)
-            DBG=$(jq -r '.debug // true' configs/build-request.json)
-            BR_OVR=$(jq -r '.kernel_branch_override // ""' configs/build-request.json)
-            DC_OVR=$(jq -r '.defconfig_override // ""' configs/build-request.json)
-            PRESETS=$(jq -c '.source_presets // ["HELLBOY017"]' configs/build-request.json)
+          # Single source only: HELLBOY017
+          # Manual-only (workflow_dispatch) — inputs always present, same idea as main
+          PRESET="HELLBOY017"
+          if ! jq -e --arg p "$PRESET" 'has($p)' "$SOURCES" >/dev/null; then
+            echo "::error::configs/sources.json must define $PRESET"
+            exit 1
           fi
+
+          MODE="${{ inputs.build_mode }}"
+          DEV="${{ inputs.device_profile }}"
+          KSUN="${{ inputs.ksun_ref || 'next' }}"
+          SUSFS="${{ inputs.susfs_ref || 'kernel-4.19' }}"
+          CLEAN="${{ inputs.clean_build }}"
+          REL="${{ inputs.make_release }}"
+          DBG="${{ inputs.debug }}"
+          BR_OVR="${{ inputs.kernel_branch_override }}"
+          DC_OVR="${{ inputs.defconfig_override }}"
 
           echo "build_mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "device_profile=$DEV" >> "$GITHUB_OUTPUT"
           echo "ksun_ref=$KSUN" >> "$GITHUB_OUTPUT"
           echo "susfs_ref=$SUSFS" >> "$GITHUB_OUTPUT"
+          echo "clean_build=$CLEAN" >> "$GITHUB_OUTPUT"
           echo "make_release=$REL" >> "$GITHUB_OUTPUT"
           echo "debug=$DBG" >> "$GITHUB_OUTPUT"
 
-          # Expand presets → matrix include
+          # HELLBOY017 only → single-entry matrix
           MATRIX=$(jq -c \
-            --argjson presets "$PRESETS" \
+            --arg p "$PRESET" \
             --arg br_ovr "${BR_OVR:-}" \
             --arg dc_ovr "${DC_OVR:-}" \
             '
-            . as $S |
-            [ $presets[] as $p |
-              if ($S | has($p) | not) then error("Unknown source preset: \($p)") else . end |
-              $S[$p] |
-              {
+            .[$p] as $S |
+            {
+              include: [{
                 preset: $p,
-                kernel_source: .kernel_source,
-                kernel_branch: (if $br_ovr != "" then $br_ovr else .kernel_branch end),
-                defconfig: (if $dc_ovr != "" then $dc_ovr else .defconfig end),
-                run_oplus_stubs: (.run_oplus_stubs // true | tostring),
-                disable_proprietary_oplus_configs: (.disable_proprietary_oplus_configs // false | tostring)
-              }
-            ] | {include: .}
+                kernel_source: $S.kernel_source,
+                kernel_branch: (if $br_ovr != "" then $br_ovr else $S.kernel_branch end),
+                defconfig: (if $dc_ovr != "" then $dc_ovr else $S.defconfig end),
+                run_oplus_stubs: ($S.run_oplus_stubs // true | tostring),
+                disable_proprietary_oplus_configs: ($S.disable_proprietary_oplus_configs // false | tostring)
+              }]
+            }
             ' "$SOURCES")
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
-          echo "Resolved matrix:"
+          echo "Resolved matrix (HELLBOY017 only):"
           echo "$MATRIX" | jq .
+          echo "clean_build=$CLEAN"
+
+  # Same as main: download custom ccache once, share to matrix jobs (avoids raw.githubusercontent throttle)
+  prepare_ccache:
+    name: Prepare ccache binary (download once)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download custom ccache once
+        run: |
+          set -uo pipefail
+          echo "::group::Download ccache"
+          url="https://raw.githubusercontent.com/WildKernels/kernel_patches/refs/heads/main/ccache/ccache-x86-64"
+          ok=0
+          for attempt in 1 2 3 4 5 6; do
+            if curl -LfsS --connect-timeout 30 --max-time 120 -H "User-Agent: Mozilla/5.0" "$url" -o ccache && [ -s ccache ]; then
+              ok=1; break
+            fi
+            echo "attempt $attempt failed (GitHub raw 504/throttle); backing off..."
+            sleep $(( attempt * 5 + RANDOM % 6 ))
+          done
+          if [ "$ok" = 1 ]; then
+            echo "✅ downloaded ccache once for all matrix jobs"
+          else
+            echo "::warning::custom ccache download failed; matrix jobs will fall back to the apt ccache"
+            rm -f ccache
+          fi
+          echo "::endgroup::"
+
+      - name: Upload ccache artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ccache-binary
+          path: ccache
+          retention-days: 1
+          if-no-files-found: warn
 
   build:
     name: ${{ needs.resolve.outputs.build_mode }} · ${{ matrix.preset }} · ${{ matrix.kernel_branch }}
-    needs: resolve
+    needs: [resolve, prepare_ccache]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     strategy:
@@ -176,7 +195,29 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
             git curl wget bc bison build-essential flex \
             libssl-dev libelf-dev python3 cpio zip unzip rsync \
-            libncurses-dev jq
+            libncurses-dev jq ccache aria2 zstd
+
+      - name: Get prebuilt ccache (downloaded once by prepare_ccache)
+        uses: actions/download-artifact@v4
+        with:
+          name: ccache-binary
+          path: ccache-dl
+        continue-on-error: true
+
+      - name: Install ccache (ECS by cctv18, shared via artifact)
+        run: |
+          set -uo pipefail
+          echo "::group::Install ccache"
+          if [ -s ccache-dl/ccache ]; then
+            sudo cp -f ccache-dl/ccache /usr/bin/ccache
+            sudo chmod +x /usr/bin/ccache
+            echo "✅ installed custom ccache from shared artifact"
+          else
+            echo "::warning::shared ccache artifact unavailable; using apt ccache"
+          fi
+          rm -rf ccache-dl
+          echo "[DEBUG] Ccache version : $(ccache --version | head -1)"
+          echo "::endgroup::"
 
       - name: Setup Clang (ZyC 14)
         run: |
@@ -194,6 +235,10 @@ jobs:
             fi
           fi
           clang --version || true
+          # Short clang version for ccache key (author pattern: CLANG_VERSION_SHORT)
+          CLANG_VER=$(clang --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "14")
+          echo "CLANG_VERSION_SHORT=${CLANG_VER%%.*}" >> "$GITHUB_ENV"
+          echo "CLANG_VERSION=$CLANG_VER" >> "$GITHUB_ENV"
 
       - name: Setup AOSP GCC
         run: |
@@ -206,6 +251,104 @@ jobs:
             toolchains/gcc32
           echo "$GITHUB_WORKSPACE/toolchains/gcc64/bin" >> "$GITHUB_PATH"
           echo "$GITHUB_WORKSPACE/toolchains/gcc32/bin" >> "$GITHUB_PATH"
+
+      - name: ♻️ Configure ccache (bounded)
+        run: |
+          echo "::group::Configure ccache environment"
+          set -euo pipefail
+          if command -v ccache >/dev/null 2>&1; then
+            CACHE_DIR="${{ github.workspace }}/.ccache"
+            CCACHE_LOG="${{ github.workspace }}/ccache.log"
+            mkdir -p "$CACHE_DIR"
+
+            SETTINGS=(
+              "CCACHE_DIR=$CACHE_DIR"
+              "CCACHE_MAXSIZE=12G"
+              "CCACHE_COMPILERCHECK=content"
+              "CCACHE_BASEDIR=${GITHUB_WORKSPACE}"
+              "CCACHE_NOHASHDIR=true"
+              "CCACHE_IGNOREOPTIONS=--sysroot*"
+              "CCACHE_COMPRESSION=true"
+              "CCACHE_COMPRESSION_LEVEL=3"
+              "CCACHE_DIRECT=true"
+              "CCACHE_FILE_CLONE=true"
+              "CCACHE_INODE_CACHE=true"
+              "CCACHE_IS_KERNEL_COMPILING=true"
+              "CCACHE_UMASK=002"
+              "CCACHE_LOGFILE=${CCACHE_LOG}"
+              "CCACHE_SLOPPINESS=file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale"
+            )
+
+            for setting in "${SETTINGS[@]}"; do
+              export "$setting"
+              echo "$setting" >> "$GITHUB_ENV"
+            done
+
+            if ccache --help 2>&1 | grep -q 'depend_mode'; then
+              export CCACHE_DEPEND=true
+              echo "CCACHE_DEPEND=true" >> "$GITHUB_ENV"
+            fi
+
+            echo "✅ ccache configured successfully"
+            echo "Current ccache configuration:"
+            ccache -p
+          else
+            echo "ccache not found, skipping configuration."
+          fi
+          echo "::endgroup::"
+
+      - name: Set ccache key
+        run: |
+          set -euo pipefail
+          # Author-style key: MODE-v1-PRESET-BRANCH-clangN (slashes → _)
+          BR_SAFE=$(echo "${{ matrix.kernel_branch }}" | tr '/:' '__')
+          MODE="${{ needs.resolve.outputs.build_mode }}"
+          PRESET="${{ matrix.preset }}"
+          CL="${CLANG_VERSION_SHORT:-14}"
+          KEY="${MODE}-v1-${PRESET}-${BR_SAFE}-clang${CL}"
+          echo "CCACHE_CACHE_KEY=$KEY" >> "$GITHUB_ENV"
+          echo "Cache key: $KEY"
+
+      - name: Restore ccache cache
+        id: restore-ccache-cache
+        if: ${{ needs.resolve.outputs.clean_build != 'true' }}
+        uses: ./.github/actions/cache/restore
+        with:
+          cache_path: ${{ github.workspace }}/.ccache
+          cache_key: ${{ env.CCACHE_CACHE_KEY }}
+          cache_bucket: "ccache-cache"
+          debug: ${{ needs.resolve.outputs.debug == 'true' }}
+          restore_keys: |
+            ${{ needs.resolve.outputs.build_mode }}-v1-${{ matrix.preset }}-
+
+      - name: Check and Prepare Caches
+        if: ${{ needs.resolve.outputs.clean_build != 'true' }}
+        shell: bash
+        run: |
+          echo "::group::Check ccache"
+          set -euo pipefail
+
+          echo "/usr/lib/ccache" >> "$GITHUB_PATH"
+
+          echo "Current ccache configuration:"
+          ccache -p || true
+
+          if [ -d "$CCACHE_DIR" ] && find "$CCACHE_DIR" -maxdepth 2 -type f -print -quit 2>/dev/null | grep -q .; then
+            echo "✅ Restored cache found"
+            echo ""
+            echo "Pre-build cache statistics:"
+            ccache -s | head -n 20
+
+            echo "Updating atime to achieve cache eviction"
+            find "${CCACHE_DIR}" -type f -exec touch -t "$(date -d "1 day ago" +%Y%m%d%H%M)" {} +
+          else
+            echo "⚠️ No existing cache - building from scratch"
+            echo "Cache will be populated for future builds"
+          fi
+
+          ccache -z
+          rm -f "$CCACHE_DIR/ccache.log" 2>/dev/null || true
+          echo "::endgroup::"
 
       - name: Normalize scripts
         run: chmod +x scripts/*.sh
@@ -223,9 +366,69 @@ jobs:
           RUN_OPLUS_STUBS: ${{ matrix.run_oplus_stubs }}
           DISABLE_PROPRIETARY_OPLUS_CONFIGS: ${{ matrix.disable_proprietary_oplus_configs }}
           SOURCE_PRESET: ${{ matrix.preset }}
+          CLEAN_BUILD: ${{ needs.resolve.outputs.clean_build }}
           ARTIFACT_DIR: ${{ github.workspace }}/artifacts
           WORK_DIR: ${{ github.workspace }}/work
         run: bash scripts/build.sh
+
+      - name: 📊 ccache Post-Build Statistics
+        id: ccache_stats
+        if: ${{ success() && needs.resolve.outputs.clean_build != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::group::ccache final statistics"
+
+          export CCACHE_DIR="${{ github.workspace }}/.ccache"
+
+          echo "Clear Temporary cache files..."
+          ccache -c || true
+
+          echo "Perform ccache eviction!"
+          # 0.5 days = 12 Hrs. Delete cache unused in 12 hrs (author pattern).
+          find "$CCACHE_DIR" -type f -mtime +0.5 -delete 2>/dev/null || true
+          find "$CCACHE_DIR" -type d -empty -delete 2>/dev/null || true
+
+          if [ -n "${CCACHE_LOGFILE:-}" ] && [ -f "${CCACHE_LOGFILE}" ]; then
+            cp "${CCACHE_LOGFILE}" "$CCACHE_DIR/" || true
+          fi
+
+          STATS="$(ccache -s)"
+          echo "$STATS"
+
+          CACHEABLE=$(echo "$STATS" | awk '/Cacheable calls:/ { match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH) }' | head -n1)
+          HITS=$(echo "$STATS" | awk '/^[[:space:]]*Hits:/ { match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH) }' | head -n1)
+          DIRECT=$(echo "$STATS" | awk '/Direct:/ { match($0, /[0-9]+/); print substr($0, RSTART, RLENGTH) }' | head -n1)
+
+          if [ "${CACHEABLE:-0}" -gt 0 ] 2>/dev/null; then
+            HIT_RATE=$(awk -v h="${HITS:-0}" -v c="$CACHEABLE" 'BEGIN{printf "%.1f", (h/c)*100}')
+            DIRECT_RATE=$(awk -v d="${DIRECT:-0}" -v c="$CACHEABLE" 'BEGIN{printf "%.1f", (d/c)*100}')
+          else
+            HIT_RATE="0.0"
+            DIRECT_RATE="0.0"
+          fi
+
+          echo "hit_rate=${HIT_RATE}%" >> "$GITHUB_OUTPUT"
+          echo "direct_rate=${DIRECT_RATE}%" >> "$GITHUB_OUTPUT"
+
+          echo "::endgroup::"
+
+          echo "## 📊 ccache Statistics" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ccache -s --verbose >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || ccache -s >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save ccache cache
+        if: ${{ success() && needs.resolve.outputs.clean_build != 'true' }}
+        uses: ./.github/actions/cache/save
+        with:
+          cache_path: ${{ github.workspace }}/.ccache
+          cache_key: ${{ env.CCACHE_CACHE_KEY }}
+          cache_bucket: "ccache-cache"
+          debug: ${{ needs.resolve.outputs.debug == 'true' }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          compression_level: 6
 
       - name: Upload artifacts
         if: success()
@@ -265,6 +468,8 @@ jobs:
             | Mode | `${{ needs.resolve.outputs.build_mode }}` |
             | Defconfig | `${{ matrix.defconfig }}` |
             | Kernel | `${{ steps.build.outputs.kernel_version }}` |
+            | Clean Build | `${{ needs.resolve.outputs.clean_build }}` |
+            | ccache Hit | `${{ steps.ccache_stats.outputs.hit_rate || 'n/a' }}` |
           files: |
             artifacts/*.zip
             artifacts/build-info.txt
