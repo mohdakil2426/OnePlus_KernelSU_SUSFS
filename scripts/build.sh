@@ -50,6 +50,11 @@ rm -rf "$KERNEL_DIR"
 git clone --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_SOURCE" "$KERNEL_DIR"
 endgroup
 
+# OnePlusOSS dumps: broken vendor/oplus symlinks (sched_assist, etc.)
+log "Fix incomplete OSS vendor symlinks / missing Kconfigs"
+( cd "$KERNEL_DIR" && bash "$SCRIPT_DIR/fix-oplus-stubs.sh" )
+endgroup
+
 # vDSO clang fix (common on 4.19 + modern clang)
 log "vDSO clang compatibility"
 for f in \
@@ -144,9 +149,15 @@ make "${MAKE_ARGS[@]}" olddefconfig
 grep -E 'CONFIG_KSU|CONFIG_KSU_SUSFS' out/.config || true
 endgroup
 
-log "Compile (jobs=$JOBS)"
-# Auto-accept new config prompts if any
-yes "" 2>/dev/null | make -j"$JOBS" "${MAKE_ARGS[@]}" 2>&1 | tee "$ARTIFACT_DIR/build.log"
+log "Compile Image (jobs=$JOBS)"
+# Explicit Image target (skip unavailable vendor modules). Capture exit of make, not tee.
+set +e
+make -j"$JOBS" "${MAKE_ARGS[@]}" Image 2>&1 | tee "$ARTIFACT_DIR/build.log"
+MAKE_RC=${PIPESTATUS[0]}
+set -e
+if [[ $MAKE_RC -ne 0 ]]; then
+  die "make Image failed with exit $MAKE_RC (see artifacts/build.log)"
+fi
 endgroup
 
 if [[ ! -f out/arch/arm64/boot/Image ]]; then
