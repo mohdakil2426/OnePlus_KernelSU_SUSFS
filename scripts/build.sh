@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # OnePlus 8 series (SM8250) kernel build orchestrator.
-# Supports selectable sources (HELLBOY017 primary; LineageOS / OnePlusOSS optional).
+# Kernel source: HELLBOY017/kernel_oneplus_sm8250 only (this branch).
 #
 # Required env:
-#   KERNEL_BRANCH   git branch of KERNEL_SOURCE
+#   KERNEL_BRANCH   git branch of KERNEL_SOURCE (default tree uses 14)
 #   BUILD_MODE      STOCK | KSUN | KSUN_SUSFS
 # Optional:
 #   KERNEL_SOURCE   git URL (default HELLBOY017)
 #   DEFCONFIG       default vendor/oplus-stock_defconfig
 #   DEVICE_PROFILE  ALL_OP8_SERIES | OP8 | OP8Pro | OP8T | OP9R
-#   SOURCE_PRESET   label for artifacts (e.g. HELLBOY017)
+#   SOURCE_PRESET   label for artifacts (HELLBOY017)
 #   RUN_OPLUS_STUBS true|false (default true)
 #   DISABLE_PROPRIETARY_OPLUS_CONFIGS true|false (default false)
+#   CLEAN_BUILD    true = no ccache; false = CC=ccache clang
 #   KSUN_REF / SUSFS_REF / JOBS / ARTIFACT_DIR / WORK_DIR
 
 set -euo pipefail
@@ -24,9 +25,10 @@ KERNEL_BRANCH="${KERNEL_BRANCH:?KERNEL_BRANCH is required}"
 BUILD_MODE="${BUILD_MODE:?BUILD_MODE is required}"
 DEFCONFIG="${DEFCONFIG:-vendor/oplus-stock_defconfig}"
 DEVICE_PROFILE="${DEVICE_PROFILE:-ALL_OP8_SERIES}"
-SOURCE_PRESET="${SOURCE_PRESET:-custom}"
+SOURCE_PRESET="${SOURCE_PRESET:-HELLBOY017}"
 RUN_OPLUS_STUBS="${RUN_OPLUS_STUBS:-true}"
 DISABLE_PROPRIETARY_OPLUS_CONFIGS="${DISABLE_PROPRIETARY_OPLUS_CONFIGS:-false}"
+CLEAN_BUILD="${CLEAN_BUILD:-false}"
 KSUN_REF="${KSUN_REF:-next}"
 SUSFS_REF="${SUSFS_REF:-kernel-4.19}"
 JOBS="${JOBS:-$(nproc)}"
@@ -99,14 +101,25 @@ fi
 log "Configure $DEFCONFIG"
 cd "$KERNEL_DIR"
 
-# Prefer clang if present
+# Prefer clang if present; wrap with ccache unless CLEAN_BUILD (author pattern)
 export ARCH=arm64
 export SUBARCH=arm64
 MAKE_ARGS=(O=out ARCH=arm64)
 
 if command -v clang >/dev/null 2>&1; then
+  if [[ "$CLEAN_BUILD" == "true" ]]; then
+    CC_CMD=clang
+    echo "🧹 Clean build mode (no ccache)"
+  elif command -v ccache >/dev/null 2>&1; then
+    CC_CMD="ccache clang"
+    echo "🚀 ccache-accelerated build"
+    ccache -s 2>/dev/null | head -n 15 || true
+  else
+    CC_CMD=clang
+    echo "ccache not found; building without cache"
+  fi
   MAKE_ARGS+=(
-    CC=clang
+    CC="$CC_CMD"
     CLANG_TRIPLE=aarch64-linux-gnu-
     CROSS_COMPILE=aarch64-linux-android-
     CROSS_COMPILE_ARM32=arm-linux-androideabi-
@@ -227,6 +240,10 @@ MAKE_RC=${PIPESTATUS[0]}
 set -e
 if [[ $MAKE_RC -ne 0 ]]; then
   die "make Image failed with exit $MAKE_RC (see artifacts/build.log)"
+fi
+if [[ "$CLEAN_BUILD" != "true" ]] && command -v ccache >/dev/null 2>&1; then
+  echo "📊 ccache post-compile:"
+  ccache -s 2>/dev/null | head -n 25 || true
 fi
 endgroup
 
