@@ -1,0 +1,27 @@
+name: Branch / device help
+description: Help choosing the correct sm8250 OSS branch for your device
+title: "[help] branch for "
+labels: ["question"]
+body:
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options:
+        - OnePlus 8
+        - OnePlus 8 Pro
+        - OnePlus 8T
+        - OnePlus 9R
+    validations:
+      required: true
+  - type: input
+    id: oos
+    attributes:
+      label: Stock OOS / Android version
+      placeholder: "e.g. OOS 14.0.0.600 / Android 14"
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Extra notes

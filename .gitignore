@@ -5,3 +5,11 @@
 *.Identifier
 *.orig
 *.rej
+work/
+artifacts/
+toolchains/
+kernel/
+out/
+*.zip
+*.log
+.DS_Store

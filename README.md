@@ -1,149 +1,122 @@
-<div align="center">
+# OnePlus 8 Series Kernel Builder (SM8250)
 
-# 🔥 Wild Kernels for OnePlus (Oppo/Realme)
+Build **stock**, **KernelSU-Next**, or **KernelSU-Next + SUSFS** kernels for:
 
-[![KernelSU-Next](https://img.shields.io/badge/KernelSU_Next-Supported-green)](https://kernelsu-next.github.io/webpage/)
-[![KernelSU](https://img.shields.io/badge/KernelSU-Supported-green)](https://kernelsu.org/)
-[![Wild KSU](https://img.shields.io/badge/Wild_KSU-Not%20Supported-cb2431)](https://github.com/WildKernels/Wild_KSU/)
-[![SUSFS](https://img.shields.io/badge/SUSFS-Integrated-orange?logo=gitlab)](https://gitlab.com/simonpunk/susfs4ksu)
-[![OnePlusOSS Tracking Status](https://img.shields.io/badge/OnePlusOSS--Tracker-active-green)](https://github.com/WildKernels/OnePlus_KernelSU_SUSFS/blob/status-page/README.md)
+| Device | SoC | Codenames |
+|--------|-----|-----------|
+| OnePlus 8 | SM8250 | `instantnoodle` |
+| OnePlus 8 Pro | SM8250 | `instantnoodlep` |
+| OnePlus 8T | SM8250 | `kebab` |
+| OnePlus 9R | SM8250-AC (SD870) | `lemonades` |
 
-</div>
+**Kernel source (only):**  
+[OnePlusOSS/android_kernel_oneplus_sm8250](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250)
 
----
-
-## ⚠️ Disclaimer
-
-Flashing this kernel will not void your warranty, but there is always a risk of bricking your device. Please make sure to:
-- 💾 Back up your data
-- 🧠 Understand the risks before proceeding
-
-- I am **not responsible** for bricked devices, damaged hardware, or any issues that arise from using this kernel.
-
-- **Please** do thorough research and fully understand the features added in this kernel before flashing it!
-
-- By flashing this kernel, **YOU** are choosing to make these modifications. If something goes wrong, **do not blame me**!
-
-<div align="center">
-  
-# **🚨 Proceed at your own risk!**
-
-</div>
+This branch is **not** for OP10+ GKI devices. Those belong on the multi-device WildKernels pipeline.
 
 ---
 
-## 🔧 Available Kernels
+## Features
 
-<div align="center">
+| Mode | What you get |
+|------|----------------|
+| **STOCK** | Non-root baseline (no KernelSU / no SUSFS) |
+| **KSUN** | [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) built-in (non-GKI 4.19) |
+| **KSUN_SUSFS** | KSUN + [SUSFS](https://gitlab.com/simonpunk/susfs4ksu) (`kernel-4.19`) |
 
-| Kernel | Repository | Status |
-|--------|------------|--------|
-| 🏗️ **GKI** | [GKI_KernelSU_SUSFS](https://github.com/WildKernels/GKI_KernelSU_SUSFS) | ✅ Active |
-| 👑 **Sultan** | [Sultan_KernelSU_SUSFS](https://github.com/WildKernels/Sultan_KernelSU_SUSFS) | ✅ Active |
-| 📱 **OnePlus/Oppo/Realme** | [OnePlus_KernelSU_SUSFS](https://github.com/WildKernels/OnePlus_KernelSU_SUSFS) | ✅ Active |
-| 📱 **Samsung** | [Samsung_KernelSU_SUSFS](https://github.com/WildKernels/Samsung_KernelSU_SUSFS) | ✅ Active |
-</div>
-
----
-
-## 🔗 Additional Resources
-
-- 🩹 [Kernel Patches](https://github.com/WildKernels/kernel_patches)
-- ⚡ [Kernel Flasher](https://github.com/fatalcoder524/KernelFlasher)
+- Manual GitHub Actions control over **all 10 official OSS branches**
+- Defconfig: `vendor/kona-perf_defconfig` (or `vendor/kona_defconfig`)
+- Flashable **AnyKernel3** ZIP
+- Linux **4.19.x** monolithic tree (not GKI / not LKM)
 
 ---
 
-## 📱 Device Compatibility
+## Build (GitHub Actions)
 
-- Please verify the device compatibility before flashing here: [Compatibility_Info](https://github.com/WildKernels/OnePlus_KernelSU_SUSFS/blob/main/compatibility.md). 
+1. Open **Actions** → **Build OP8 Series Kernel (SM8250)**
+2. **Run workflow**
+3. Choose:
 
----
+| Input | Purpose |
+|-------|---------|
+| `kernel_branch` | One of the 10 OnePlusOSS branches |
+| `build_mode` | `STOCK` / `KSUN` / `KSUN_SUSFS` |
+| `device_profile` | AnyKernel device check filter |
+| `defconfig` | kona-perf (default) or kona |
+| `ksun_ref` | KernelSU-Next ref (default `next`) |
+| `susfs_ref` | SUSFS ref (default `kernel-4.19`) |
+| `make_release` | Publish a GitHub Release |
 
-## 📱 OnePlusOSS Repositories Tracking
+Artifacts appear on the run page (and as a release if enabled).
 
-- 📊 **Live Dashboard**: [OnePlus Repos Tracking & Changes](https://github.com/WildKernels/OnePlus_KernelSU_SUSFS/blob/status-page/README.md)
-- ⏱️ **Update Frequency**: Every 2 hours (Automated)
----
+### Recommended branches
 
-## ✨ Features
+| Device + ROM | Branch |
+|--------------|--------|
+| OP8T on OOS 14 | `oneplus/sm8250_u_14.0.0_op8t` |
+| OP9R on OOS 14 | `oneplus/sm8250_u_14.0.0_op9r` |
+| OP8 / 8 Pro on OOS 13.1 | `oneplus/sm8250_t_13.1_op8` |
+| OP9R on OOS 13.1 | `oneplus/sm8250_t_13.1_op9r` |
 
-- 🔐 **KernelSU / KernelSU-Next**: A root solution for Android GKI devices that works in kernel mode and grants root permission to userspace applications directly in kernel space
-- 🔥 **WildKSU Manager Support**: Support for the Root Manager developed by our team with lots of customisations
-- 🥷 **SUSFS**: An addon root hiding kernel patches and userspace module for KernelSU
-- 🛡️ **BBG**: LSM-based Baseband Guard security to protect critical device partitions. abl/efisp can be added to whitelist for efisp exploit devices.
-- 🛠️ **HMBIRD SCX**: Scheduler extensions for SM8750/MT6991 devices
-- 🖧 **BBRv1**: Improved TCP congestion control
-- 🖧 **BBRv3**: Improved TCP congestion control
-- 🚦 **CAKE and PIE qdisc Support**: Better Net Schedulers
-- ✅ **LTO**: Link Time Optimisation enabled
-- 🚀 **Optimisation patches**: Memory, I/O, CPU scheduler, network and other general tunings
-- 🌐 **TTL Target Support**: Network packet manipulation
-- 🧱 **IP Set & IPv6 NAT Support**: Advanced firewall capabilities and IPv6 NAT Support
-- ⚡️ **TMPFS XATTR / POSIX ACL**: Extended TMPFS support for meta modules and Mountify
-- </> **Unicode Bypass Fix**: Prevent path traversal and other detections using non-printable Unicode codepoints [Experimental]
-- 🖥️ **Droidspaces Support**: Support Portable Linux containers to run full Linux environments.
-- 🔃 **NTSync**: Provide high-performance, low-latency synchronization primitives compatible with the Windows NT kernel API
+Full map: [`configs/registry.json`](configs/registry.json) and [`compatibility.md`](compatibility.md).
 
 ---
 
-## 📋 Installation Instructions
+## Local build (optional)
 
-For GKI installation, please follow the official guide:
-
-📖 **[KernelSU Installation Guide](https://kernelsu.org/guide/installation.html)**
-
-You can also find Installation instructions in the release notes.
-
----
-
-## 🌟 Special Thanks
-
-**These amazing people help make this project possible! ❤️**
-
-<div align="center">
-
-
-| 🔧 **Project** | 👨‍💻 **Developer** | 🔗 **Link** |
-|:---------------:|:----------------:|:-----------:|
-| **KernelSU** | tiann | [![GitHub](https://img.shields.io/badge/GitHub-tiann-blue?style=flat-square&logo=github)](https://github.com/tiann/KernelSU) |
-| **KernelSU-Next** | rifsxd | [![GitHub](https://img.shields.io/badge/GitHub-rifsxd-blue?style=flat-square&logo=github)](https://github.com/KernelSU-Next/KernelSU-Next) |
-| **Magic-KSU** | 5ec1cff | [![GitHub](https://img.shields.io/badge/GitHub-5ec1cff-blue?style=flat-square&logo=github)](https://github.com/5ec1cff/KernelSU) |
-| **SUSFS** | simonpunk | [![GitLab](https://img.shields.io/badge/GitLab-simonpunk-orange?style=flat-square&logo=gitlab)](https://gitlab.com/simonpunk/susfs4ksu.git) |
-| **SUSFS Module** | sidex15 | [![GitHub](https://img.shields.io/badge/GitHub-sidex15-blue?style=flat-square&logo=github)](https://github.com/sidex15) |
-| **Sultan Kernels** | kerneltoast | [![GitHub](https://img.shields.io/badge/GitHub-kerneltoast-blue?style=flat-square&logo=github)](https://github.com/kerneltoast) |
-| **Baseband Guard** | vc-teahouse | [![GitHub](https://img.shields.io/badge/GitHub-vc--teahouse-blue?style=flat-square&logo=github)](https://github.com/vc-teahouse/Baseband-guard.git) |
-| **Droidspaces** | ravindu644 | [![GitHub](https://img.shields.io/badge/GitHub-ravindu644-blue?style=flat-square&logo=github)](https://github.com/ravindu644/Droidspaces-OSS.git) |
-
-</div>
-
-*If you have contributed and are not listed here, please remind me!* 🙏
+```bash
+# Linux host with clang + aarch64/arm android GCC on PATH
+export KERNEL_BRANCH=oneplus/sm8250_u_14.0.0_op8t
+export BUILD_MODE=KSUN_SUSFS   # or STOCK | KSUN
+export DEVICE_PROFILE=OP8T
+chmod +x scripts/*.sh
+bash scripts/build.sh
+# output: artifacts/*.zip
+```
 
 ---
 
-## 💬 Support
+## Flash / safety
 
-If you encounter any issues or need help, feel free to:
-- 🐛 Open an issue in this repository
-- 💬 Reach out to me directly
+- Unlock bootloader (data wipe).
+- Match **kernel branch ↔ stock OOS Android version**.
+- Keep a stock `boot` backup (MSM/EDL if needed).
+- Flash AnyKernel3 zip via recovery / Kernel Flasher.
+- After major OTA, re-flash a matching build.
+- **You** are responsible for bricked devices — research before flashing.
 
----
-
-## 📱 Connect With Us
-
-<div align="center">
-  
-[![Telegram](https://img.shields.io/badge/Telegram-fatalcoder524-blue?logo=telegram)](https://t.me/anonymous_yolo)
-[![Telegram Group](https://img.shields.io/badge/Telegram-WildKernels-blue?logo=telegram)](https://t.me/WildKernelsTG)
-
-</div>
+For KSUN_SUSFS: install a SUSFS userspace module (e.g. [sidex15/susfs4ksu-module](https://github.com/sidex15/susfs4ksu-module)) after root works.
 
 ---
 
-## 💝 Donations
+## Repo layout
 
-Any and all donations are appreciated!
+```
+configs/registry.json     # branches, devices, modes
+scripts/build.sh          # orchestrator
+scripts/apply-ksun.sh
+scripts/apply-susfs.sh
+scripts/add-manual-hooks.sh
+scripts/package-anykernel.sh
+.github/workflows/build-kernel.yml
+docs/reports/             # feasibility research
+```
 
-PayPal: [paypal.me/fatalcoder524](https://paypal.me/fatalcoder524)
+---
 
-DM on Telegram for UPI donations!
+## Credits
 
+- [OnePlusOSS](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250)
+- [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next)
+- [KernelSU](https://github.com/tiann/KernelSU)
+- [simonpunk/susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu)
+- [sidex15/susfs4ksu-module](https://github.com/sidex15/susfs4ksu-module)
+- [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3)
+- Community non-GKI OP8 builders (reference integration patterns)
+
+---
+
+## Docs
+
+- [compatibility.md](compatibility.md)
+- [SM8250 KSUN/SUSFS feasibility report](docs/reports/sm8250-ksun-susfs-build-feasibility-report.md)

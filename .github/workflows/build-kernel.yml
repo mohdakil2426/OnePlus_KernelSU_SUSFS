@@ -1,0 +1,209 @@
+name: Build OP8 Series Kernel (SM8250)
+
+# OnePlus 8 / 8 Pro / 8T / 9R only.
+# Source: OnePlusOSS/android_kernel_oneplus_sm8250 (all official branches)
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_branch:
+        description: 'OnePlusOSS sm8250 kernel branch'
+        required: true
+        type: choice
+        default: 'oneplus/sm8250_u_14.0.0_op8t'
+        options:
+          - oneplus/SM8250_Q_10.0
+          - oneplus/SM8250_R_11.0
+          - oneplus/SM8250_R_11.0_9R
+          - oneplus/sm8250_s_12.1
+          - oneplus/sm8250_t_13.0.0_op8
+          - oneplus/sm8250_t_13.0.0_op9r
+          - oneplus/sm8250_t_13.1_op8
+          - oneplus/sm8250_t_13.1_op9r
+          - oneplus/sm8250_u_14.0.0_op8t
+          - oneplus/sm8250_u_14.0.0_op9r
+      build_mode:
+        description: 'STOCK = non-root | KSUN = KernelSU-Next | KSUN_SUSFS = KSUN + SUSFS'
+        required: true
+        type: choice
+        default: 'KSUN_SUSFS'
+        options:
+          - STOCK
+          - KSUN
+          - KSUN_SUSFS
+      device_profile:
+        description: 'AnyKernel device check codenames'
+        required: true
+        type: choice
+        default: 'ALL_OP8_SERIES'
+        options:
+          - ALL_OP8_SERIES
+          - OP8
+          - OP8Pro
+          - OP8T
+          - OP9R
+      defconfig:
+        description: 'Kernel defconfig'
+        required: true
+        type: choice
+        default: 'vendor/kona-perf_defconfig'
+        options:
+          - vendor/kona-perf_defconfig
+          - vendor/kona_defconfig
+      ksun_ref:
+        description: 'KernelSU-Next git ref (branch/tag). Empty = next'
+        required: false
+        type: string
+        default: 'next'
+      susfs_ref:
+        description: 'SUSFS branch/tag (only for KSUN_SUSFS). Empty = kernel-4.19'
+        required: false
+        type: string
+        default: 'kernel-4.19'
+      make_release:
+        description: 'Create GitHub Release with artifacts'
+        required: true
+        type: boolean
+        default: false
+      debug:
+        description: 'Upload build log on failure'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  KERNEL_SOURCE: https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250.git
+
+jobs:
+  build:
+    name: ${{ inputs.build_mode }} · ${{ inputs.kernel_branch }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout builder
+        uses: actions/checkout@v4
+
+      - name: Disk cleanup
+        uses: ./.github/actions/disk-cleanup
+
+      - name: Install packages
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            git curl wget bc bison build-essential flex \
+            libssl-dev libelf-dev python3 cpio zip unzip rsync \
+            libncurses-dev
+
+      - name: Setup Clang (ZyC 14)
+        run: |
+          set -euo pipefail
+          mkdir -p toolchains/clang
+          curl -fsSL \
+            "https://github.com/ZyCromerZ/Clang/releases/download/14.0.6-20250704-release/Clang-14.0.6-20250704.tar.gz" \
+            | tar -xzf - -C toolchains/clang
+          # Some tarballs nest bin/; normalize
+          if [ ! -x toolchains/clang/bin/clang ]; then
+            nested=$(find toolchains/clang -maxdepth 3 -type f -name clang | head -1)
+            if [ -n "$nested" ]; then
+              root=$(dirname "$(dirname "$nested")")
+              echo "Using nested clang root: $root"
+              echo "$root/bin" >> "$GITHUB_PATH"
+            fi
+          else
+            echo "$GITHUB_WORKSPACE/toolchains/clang/bin" >> "$GITHUB_PATH"
+          fi
+          clang --version | head -2
+
+      - name: Setup AOSP GCC (aarch64 + arm)
+        run: |
+          set -euo pipefail
+          git clone --depth=1 -b android12L-release \
+            https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 \
+            toolchains/gcc64
+          git clone --depth=1 -b android12L-release \
+            https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 \
+            toolchains/gcc32
+          echo "$GITHUB_WORKSPACE/toolchains/gcc64/bin" >> "$GITHUB_PATH"
+          echo "$GITHUB_WORKSPACE/toolchains/gcc32/bin" >> "$GITHUB_PATH"
+
+      - name: Normalize script permissions
+        run: chmod +x scripts/*.sh
+
+      - name: Build kernel
+        id: build
+        env:
+          KERNEL_SOURCE: ${{ env.KERNEL_SOURCE }}
+          KERNEL_BRANCH: ${{ inputs.kernel_branch }}
+          BUILD_MODE: ${{ inputs.build_mode }}
+          DEFCONFIG: ${{ inputs.defconfig }}
+          DEVICE_PROFILE: ${{ inputs.device_profile }}
+          KSUN_REF: ${{ inputs.ksun_ref || 'next' }}
+          SUSFS_REF: ${{ inputs.susfs_ref || 'kernel-4.19' }}
+          ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+          WORK_DIR: ${{ github.workspace }}/work
+        run: bash scripts/build.sh
+
+      - name: Upload artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.zip_name || 'op8series-kernel' }}
+          path: |
+            artifacts/*.zip
+            artifacts/Image
+            artifacts/build-info.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload build log on failure
+        if: failure() && inputs.debug
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-failure
+          path: |
+            artifacts/build.log
+            work/**/*.rej
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Create release
+        if: success() && inputs.make_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: op8series-${{ github.run_number }}
+          name: OP8 Series ${{ inputs.build_mode }} — ${{ inputs.kernel_branch }}
+          body: |
+            ## OnePlus 8 Series Kernel (SM8250)
+
+            | Field | Value |
+            |-------|--------|
+            | Source | `OnePlusOSS/android_kernel_oneplus_sm8250` |
+            | Branch | `${{ inputs.kernel_branch }}` |
+            | Mode | `${{ inputs.build_mode }}` |
+            | Device profile | `${{ inputs.device_profile }}` |
+            | Defconfig | `${{ inputs.defconfig }}` |
+            | KSUN ref | `${{ inputs.ksun_ref }}` |
+            | SUSFS ref | `${{ inputs.susfs_ref }}` |
+            | Kernel | `${{ steps.build.outputs.kernel_version }}` |
+
+            ### Modes
+            - **STOCK** — non-root baseline
+            - **KSUN** — KernelSU-Next only
+            - **KSUN_SUSFS** — KernelSU-Next + SUSFS (`kernel-4.19`)
+
+            ### Flash
+            Use a custom recovery (or Kernel Flasher) with the AnyKernel3 zip.
+            Match branch to your stock OOS Android version. Unlock BL; keep stock boot backup.
+
+            See `compatibility.md` and `docs/reports/`.
+          files: |
+            artifacts/*.zip
+            artifacts/build-info.txt
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
