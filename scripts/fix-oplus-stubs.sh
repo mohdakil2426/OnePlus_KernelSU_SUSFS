@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# OnePlusOSS sm8250 dumps ship broken symlinks into proprietary vendor/oplus trees
-# that are not published. Replace broken links with minimal stubs so kconfig/make work.
+# OnePlusOSS sm8250 dumps ship broken symlinks into proprietary vendor/oplus
+# (and some qcom DT) trees that are not published. Replace broken links with
+# minimal stubs so defconfig / make can run.
 # Run from kernel source root.
 
-set -euo pipefail
+set -eu
+# Do NOT enable pipefail — head/find pipelines must not abort the job.
 
 log() { echo "[stubs] $*"; }
 
@@ -12,82 +14,77 @@ if [[ ! -f Makefile ]]; then
   exit 1
 fi
 
-# Known broken vendor links on OnePlusOSS sm8250 (U/T/S era)
-declare -a KNOWN_LINKS=(
-  "kernel/sched_assist"
-  "kernel/tuning"
-  "kernel/uad"
-)
-
 stub_dir() {
   local path="$1"
   mkdir -p "$path"
   if [[ ! -f "$path/Kconfig" ]]; then
-    cat > "$path/Kconfig" << 'EOF'
-# Stub Kconfig: proprietary OnePlus/Oplus sources not in public OSS dump.
-# Intentionally empty so defconfig can proceed.
-EOF
+    printf '%s\n' '# Stub: proprietary source not in public OnePlusOSS dump' > "$path/Kconfig"
   fi
   if [[ ! -f "$path/Makefile" ]]; then
-    cat > "$path/Makefile" << 'EOF'
-# Stub Makefile — no objects (proprietary sources unavailable)
-EOF
+    printf '%s\n' '# Stub Makefile — no objects' > "$path/Makefile"
   fi
 }
 
-log "Fixing known broken oplus symlinks"
-for rel in "${KNOWN_LINKS[@]}"; do
-  if [[ -L "$rel" ]]; then
-    tgt=$(readlink "$rel" || true)
-    if [[ ! -e "$rel" ]]; then
-      log "Broken symlink $rel -> $tgt ; replacing with stub dir"
-      rm -f "$rel"
-      stub_dir "$rel"
-    else
-      log "Symlink $rel resolves OK"
-    fi
+stub_file() {
+  local path="$1"
+  mkdir -p "$(dirname "$path")"
+  if [[ ! -e "$path" ]]; then
+    case "$path" in
+      *.h)
+        printf '%s\n' '/* Stub header: proprietary source unavailable */' > "$path"
+        ;;
+      *.c)
+        printf '%s\n' '/* Stub source: proprietary source unavailable */' > "$path"
+        ;;
+      *)
+        : > "$path"
+        ;;
+    esac
+  fi
+}
+
+fix_broken_symlink() {
+  local link="$1"
+  local base
+  base=$(basename "$link")
+  log "Broken symlink: $link -> $(readlink "$link" 2>/dev/null || echo '?')"
+  rm -f "$link"
+  # Heuristic: extension => file stub, else directory stub
+  if [[ "$base" == *.* ]]; then
+    stub_file "$link"
+  else
+    stub_dir "$link"
+  fi
+}
+
+log "Scanning for broken symlinks under kernel/ drivers/ arch/ include/ techpack/"
+# Portable: no process-substitution pipefail traps
+mapfile -t links < <(find kernel drivers techpack arch include -type l 2>/dev/null || true)
+for link in "${links[@]+"${links[@]}"}"; do
+  [[ -z "${link:-}" ]] && continue
+  if [[ ! -e "$link" ]]; then
+    fix_broken_symlink "$link"
+  fi
+done
+
+# Explicit known hotspots (if find missed somehow)
+for rel in \
+  kernel/sched_assist \
+  kernel/tuning \
+  kernel/uad \
+  arch/arm64/boot/dts/vendor
+do
+  if [[ -L "$rel" && ! -e "$rel" ]]; then
+    fix_broken_symlink "$rel"
   elif [[ ! -e "$rel" ]]; then
-    log "Missing $rel ; creating stub dir"
+    log "Missing path $rel — creating stub dir"
     stub_dir "$rel"
   fi
 done
 
-# Any other broken symlinks under top-level important trees
-log "Scanning for other broken symlinks (kernel drivers techpack arch)"
-while IFS= read -r -d '' link; do
-  if [[ ! -e "$link" ]]; then
-    log "Broken symlink: $link -> $(readlink "$link" || echo '?')"
-    rm -f "$link"
-    # If name looks like a source tree dir, stub as directory with Kconfig
-    parent=$(dirname "$link")
-    base=$(basename "$link")
-    if [[ "$base" == *.* ]]; then
-      # file-like symlink
-      mkdir -p "$parent"
-      : > "$link"
-    else
-      stub_dir "$link"
-    fi
-  fi
-done < <(find kernel drivers techpack arch include -type l -print0 2>/dev/null || true)
+# DT vendor stub: empty dts folder is enough for pure Image builds
+if [[ -d arch/arm64/boot/dts/vendor ]] && [[ ! -f arch/arm64/boot/dts/vendor/Makefile ]]; then
+  printf '%s\n' '# Stub DT vendor tree' > arch/arm64/boot/dts/vendor/Makefile
+fi
 
-# Ensure every `source "path/Kconfig"` that is missing gets a stub
-log "Stubbing missing Kconfig source paths"
-while IFS= read -r line; do
-  # source "foo/bar/Kconfig" or source foo/bar/Kconfig
-  path=$(echo "$line" | sed -n 's/.*source[[:space:]]*"\([^"]*\)".*/\1/p')
-  if [[ -z "$path" ]]; then
-    path=$(echo "$line" | sed -n 's/.*source[[:space:]]\+\([^[:space:]]\+\).*/\1/p')
-  fi
-  [[ -z "$path" ]] && continue
-  [[ "$path" == /* ]] && continue
-  if [[ ! -f "$path" ]]; then
-    log "Missing sourced Kconfig: $path"
-    mkdir -p "$(dirname "$path")"
-    cat > "$path" << 'EOF'
-# Stub Kconfig for missing OSS path
-EOF
-  fi
-done < <(grep -RIn --include='*Kconfig*' -E '^\s*source\s' . 2>/dev/null | head -5000 || true)
-
-log "Oplus/vendor stub fix complete"
+log "Oplus/vendor symlink stub fix complete"
