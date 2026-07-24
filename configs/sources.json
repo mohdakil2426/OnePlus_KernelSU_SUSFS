@@ -6,24 +6,6 @@
     "defconfig": "vendor/oplus-stock_defconfig",
     "run_oplus_stubs": true,
     "disable_proprietary_oplus_configs": false,
-    "notes": "Primary OP8 series source. Branch 14 + oplus-stock_defconfig. STOCK build verified."
-  },
-  "LINEAGEOS": {
-    "label": "LineageOS official (custom ROM)",
-    "kernel_source": "https://github.com/LineageOS/android_kernel_oneplus_sm8250.git",
-    "kernel_branch": "lineage-23.2",
-    "defconfig": "vendor/kona-perf_defconfig",
-    "run_oplus_stubs": true,
-    "disable_proprietary_oplus_configs": false,
-    "notes": "For LineageOS ROMs. Verify defconfig on branch if build fails."
-  },
-  "ONEPLUS_OSS": {
-    "label": "OnePlusOSS official (incomplete — experimental)",
-    "kernel_source": "https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250.git",
-    "kernel_branch": "oneplus/sm8250_u_14.0.0_op8t",
-    "defconfig": "vendor/kona-perf_defconfig",
-    "run_oplus_stubs": true,
-    "disable_proprietary_oplus_configs": true,
-    "notes": "Broken vendor/oplus symlinks; not recommended."
+    "notes": "Only kernel source for this branch. STOCK verified on branch 14 + oplus-stock_defconfig."
   }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OnePlusOSS sm8250 dumps ship many broken symlinks into proprietary
+# Some sm8250 trees (and incomplete dumps) ship broken symlinks into proprietary
 # vendor/oplus and qcom DT trees. Replace ALL broken symlinks under the
 # kernel tree with minimal stubs so defconfig / Image build can proceed.
 # Run from kernel source root.

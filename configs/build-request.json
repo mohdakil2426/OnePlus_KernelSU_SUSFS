@@ -1,9 +1,12 @@
 {
-  "source_presets": ["HELLBOY017"],
+  "_comment": "Local notes / defaults only. CI does NOT auto-run on this file (manual workflow_dispatch only, same as main).",
   "build_mode": "STOCK",
   "device_profile": "ALL_OP8_SERIES",
+  "kernel_branch_override": "",
+  "defconfig_override": "",
   "ksun_ref": "next",
   "susfs_ref": "kernel-4.19",
+  "clean_build": false,
   "make_release": false,
   "debug": true
 }
