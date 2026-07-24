@@ -1,12 +1,21 @@
 name: Build OP8 Series Kernel (SM8250)
 
-# OnePlus 8 / 8 Pro / 8T / 9R only.
-# Source: OnePlusOSS/android_kernel_oneplus_sm8250 (all official branches)
+# Runs on branch op8series-sm8250-ksu-susfs only.
+# - push: reads configs/build-request.json (used when branch is not default;
+#   workflow_dispatch from API requires workflow on default branch)
+# - workflow_dispatch: UI dropdowns (works once this branch is default, or workflow is on default)
 
 permissions:
   contents: write
 
 on:
+  push:
+    branches:
+      - op8series-sm8250-ksu-susfs
+    paths:
+      - configs/build-request.json
+      - scripts/**
+      - .github/workflows/build-kernel.yml
   workflow_dispatch:
     inputs:
       kernel_branch:
@@ -29,7 +38,7 @@ on:
         description: 'STOCK = non-root | KSUN = KernelSU-Next | KSUN_SUSFS = KSUN + SUSFS'
         required: true
         type: choice
-        default: 'KSUN_SUSFS'
+        default: 'STOCK'
         options:
           - STOCK
           - KSUN
@@ -78,8 +87,55 @@ env:
   KERNEL_SOURCE: https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250.git
 
 jobs:
+  resolve:
+    name: Resolve build request
+    runs-on: ubuntu-latest
+    outputs:
+      kernel_branch: ${{ steps.r.outputs.kernel_branch }}
+      build_mode: ${{ steps.r.outputs.build_mode }}
+      device_profile: ${{ steps.r.outputs.device_profile }}
+      defconfig: ${{ steps.r.outputs.defconfig }}
+      ksun_ref: ${{ steps.r.outputs.ksun_ref }}
+      susfs_ref: ${{ steps.r.outputs.susfs_ref }}
+      make_release: ${{ steps.r.outputs.make_release }}
+      debug: ${{ steps.r.outputs.debug }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve inputs
+        id: r
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "kernel_branch=${{ inputs.kernel_branch }}" >> "$GITHUB_OUTPUT"
+            echo "build_mode=${{ inputs.build_mode }}" >> "$GITHUB_OUTPUT"
+            echo "device_profile=${{ inputs.device_profile }}" >> "$GITHUB_OUTPUT"
+            echo "defconfig=${{ inputs.defconfig }}" >> "$GITHUB_OUTPUT"
+            echo "ksun_ref=${{ inputs.ksun_ref || 'next' }}" >> "$GITHUB_OUTPUT"
+            echo "susfs_ref=${{ inputs.susfs_ref || 'kernel-4.19' }}" >> "$GITHUB_OUTPUT"
+            echo "make_release=${{ inputs.make_release }}" >> "$GITHUB_OUTPUT"
+            echo "debug=${{ inputs.debug }}" >> "$GITHUB_OUTPUT"
+          else
+            # push: configs/build-request.json on this branch
+            jq -r '
+              "kernel_branch=\(.kernel_branch)",
+              "build_mode=\(.build_mode)",
+              "device_profile=\(.device_profile)",
+              "defconfig=\(.defconfig)",
+              "ksun_ref=\(.ksun_ref // "next")",
+              "susfs_ref=\(.susfs_ref // "kernel-4.19")",
+              "make_release=\(.make_release // false)",
+              "debug=\(.debug // true)"
+            ' configs/build-request.json >> "$GITHUB_OUTPUT"
+          fi
+          echo "Resolved:"
+          cat "$GITHUB_OUTPUT"
+
   build:
-    name: ${{ inputs.build_mode }} · ${{ inputs.kernel_branch }}
+    name: ${{ needs.resolve.outputs.build_mode }} · ${{ needs.resolve.outputs.kernel_branch }}
+    needs: resolve
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -97,7 +153,7 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
             git curl wget bc bison build-essential flex \
             libssl-dev libelf-dev python3 cpio zip unzip rsync \
-            libncurses-dev
+            libncurses-dev jq
 
       - name: Setup Clang (ZyC 14)
         run: |
@@ -106,12 +162,10 @@ jobs:
           curl -fsSL \
             "https://github.com/ZyCromerZ/Clang/releases/download/14.0.6-20250704-release/Clang-14.0.6-20250704.tar.gz" \
             | tar -xzf - -C toolchains/clang
-          # Some tarballs nest bin/; normalize
           if [ ! -x toolchains/clang/bin/clang ]; then
             nested=$(find toolchains/clang -maxdepth 3 -type f -name clang | head -1)
             if [ -n "$nested" ]; then
               root=$(dirname "$(dirname "$nested")")
-              echo "Using nested clang root: $root"
               echo "$root/bin" >> "$GITHUB_PATH"
             fi
           else
@@ -138,12 +192,12 @@ jobs:
         id: build
         env:
           KERNEL_SOURCE: ${{ env.KERNEL_SOURCE }}
-          KERNEL_BRANCH: ${{ inputs.kernel_branch }}
-          BUILD_MODE: ${{ inputs.build_mode }}
-          DEFCONFIG: ${{ inputs.defconfig }}
-          DEVICE_PROFILE: ${{ inputs.device_profile }}
-          KSUN_REF: ${{ inputs.ksun_ref || 'next' }}
-          SUSFS_REF: ${{ inputs.susfs_ref || 'kernel-4.19' }}
+          KERNEL_BRANCH: ${{ needs.resolve.outputs.kernel_branch }}
+          BUILD_MODE: ${{ needs.resolve.outputs.build_mode }}
+          DEFCONFIG: ${{ needs.resolve.outputs.defconfig }}
+          DEVICE_PROFILE: ${{ needs.resolve.outputs.device_profile }}
+          KSUN_REF: ${{ needs.resolve.outputs.ksun_ref }}
+          SUSFS_REF: ${{ needs.resolve.outputs.susfs_ref }}
           ARTIFACT_DIR: ${{ github.workspace }}/artifacts
           WORK_DIR: ${{ github.workspace }}/work
         run: bash scripts/build.sh
@@ -161,7 +215,7 @@ jobs:
           retention-days: 30
 
       - name: Upload build log on failure
-        if: failure() && inputs.debug
+        if: failure() && needs.resolve.outputs.debug == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: build-log-failure
@@ -172,35 +226,23 @@ jobs:
           retention-days: 14
 
       - name: Create release
-        if: success() && inputs.make_release
+        if: success() && needs.resolve.outputs.make_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: op8series-${{ github.run_number }}
-          name: OP8 Series ${{ inputs.build_mode }} — ${{ inputs.kernel_branch }}
+          name: OP8 Series ${{ needs.resolve.outputs.build_mode }} — ${{ needs.resolve.outputs.kernel_branch }}
           body: |
             ## OnePlus 8 Series Kernel (SM8250)
 
             | Field | Value |
             |-------|--------|
+            | Branch (git) | `op8series-sm8250-ksu-susfs` |
             | Source | `OnePlusOSS/android_kernel_oneplus_sm8250` |
-            | Branch | `${{ inputs.kernel_branch }}` |
-            | Mode | `${{ inputs.build_mode }}` |
-            | Device profile | `${{ inputs.device_profile }}` |
-            | Defconfig | `${{ inputs.defconfig }}` |
-            | KSUN ref | `${{ inputs.ksun_ref }}` |
-            | SUSFS ref | `${{ inputs.susfs_ref }}` |
+            | Kernel branch | `${{ needs.resolve.outputs.kernel_branch }}` |
+            | Mode | `${{ needs.resolve.outputs.build_mode }}` |
+            | Device profile | `${{ needs.resolve.outputs.device_profile }}` |
+            | Defconfig | `${{ needs.resolve.outputs.defconfig }}` |
             | Kernel | `${{ steps.build.outputs.kernel_version }}` |
-
-            ### Modes
-            - **STOCK** — non-root baseline
-            - **KSUN** — KernelSU-Next only
-            - **KSUN_SUSFS** — KernelSU-Next + SUSFS (`kernel-4.19`)
-
-            ### Flash
-            Use a custom recovery (or Kernel Flasher) with the AnyKernel3 zip.
-            Match branch to your stock OOS Android version. Unlock BL; keep stock boot backup.
-
-            See `compatibility.md` and `docs/reports/`.
           files: |
             artifacts/*.zip
             artifacts/build-info.txt
