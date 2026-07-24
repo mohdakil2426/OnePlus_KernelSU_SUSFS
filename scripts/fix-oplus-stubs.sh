@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# OnePlusOSS sm8250 dumps ship broken symlinks into proprietary vendor/oplus
-# (and some qcom DT) trees that are not published. Replace broken links with
-# minimal stubs so defconfig / make can run.
+# OnePlusOSS sm8250 dumps ship many broken symlinks into proprietary
+# vendor/oplus and qcom DT trees. Replace ALL broken symlinks under the
+# kernel tree with minimal stubs so defconfig / Image build can proceed.
 # Run from kernel source root.
 
 set -eu
-# Do NOT enable pipefail — head/find pipelines must not abort the job.
+# No pipefail — find/read loops must not abort the job.
 
 log() { echo "[stubs] $*"; }
 
@@ -28,19 +28,20 @@ stub_dir() {
 stub_file() {
   local path="$1"
   mkdir -p "$(dirname "$path")"
-  if [[ ! -e "$path" ]]; then
-    case "$path" in
-      *.h)
-        printf '%s\n' '/* Stub header: proprietary source unavailable */' > "$path"
-        ;;
-      *.c)
-        printf '%s\n' '/* Stub source: proprietary source unavailable */' > "$path"
-        ;;
-      *)
-        : > "$path"
-        ;;
-    esac
+  if [[ -e "$path" ]]; then
+    return 0
   fi
+  case "$path" in
+    *.h)
+      printf '%s\n' '/* Stub header: proprietary source unavailable */' > "$path"
+      ;;
+    *.c|*.S|*.s)
+      printf '%s\n' '/* Stub source: proprietary source unavailable */' > "$path"
+      ;;
+    *)
+      : > "$path"
+      ;;
+  esac
 }
 
 fix_broken_symlink() {
@@ -49,7 +50,6 @@ fix_broken_symlink() {
   base=$(basename "$link")
   log "Broken symlink: $link -> $(readlink "$link" 2>/dev/null || echo '?')"
   rm -f "$link"
-  # Heuristic: extension => file stub, else directory stub
   if [[ "$base" == *.* ]]; then
     stub_file "$link"
   else
@@ -57,34 +57,39 @@ fix_broken_symlink() {
   fi
 }
 
-log "Scanning for broken symlinks under kernel/ drivers/ arch/ include/ techpack/"
-# Portable: no process-substitution pipefail traps
-mapfile -t links < <(find kernel drivers techpack arch include -type l 2>/dev/null || true)
-for link in "${links[@]+"${links[@]}"}"; do
-  [[ -z "${link:-}" ]] && continue
+log "Scanning entire tree for broken symlinks (excl. .git)"
+count=0
+# Use find -print0 for safety
+while IFS= read -r -d '' link; do
   if [[ ! -e "$link" ]]; then
     fix_broken_symlink "$link"
+    count=$((count + 1))
   fi
-done
+done < <(find . -path './.git' -prune -o -type l -print0 2>/dev/null)
 
-# Explicit known hotspots (if find missed somehow)
-for rel in \
-  kernel/sched_assist \
-  kernel/tuning \
-  kernel/uad \
-  arch/arm64/boot/dts/vendor
-do
-  if [[ -L "$rel" && ! -e "$rel" ]]; then
-    fix_broken_symlink "$rel"
-  elif [[ ! -e "$rel" ]]; then
-    log "Missing path $rel — creating stub dir"
-    stub_dir "$rel"
+log "Fixed $count broken symlinks"
+
+# Also stub missing Kconfig targets that are hard-sourced (no $ vars)
+# e.g. source block/blk/Kconfig after we already stubbed the dir
+log "Ensuring sourced Kconfig files exist (static paths only)"
+while IFS= read -r line; do
+  # Extract path from: source "path"  OR  source path
+  path=""
+  if [[ "$line" =~ source[[:space:]]+\"([^\"]+)\" ]]; then
+    path="${BASH_REMATCH[1]}"
+  elif [[ "$line" =~ source[[:space:]]+([^[:space:]#]+) ]]; then
+    path="${BASH_REMATCH[1]}"
   fi
-done
+  [[ -z "$path" ]] && continue
+  # Skip make variables and absolute junk
+  [[ "$path" == *'$'* ]] && continue
+  [[ "$path" == *'('* ]] && continue
+  [[ "$path" == /* ]] && continue
+  if [[ ! -f "$path" ]]; then
+    log "Stub missing sourced Kconfig: $path"
+    mkdir -p "$(dirname "$path")"
+    printf '%s\n' '# Stub Kconfig (sourced but missing from OSS dump)' > "$path"
+  fi
+done < <(grep -RIn --include='*Kconfig*' -E '^[[:space:]]*source[[:space:]]' . 2>/dev/null | sed 's/^[^:]*:[0-9]*://' || true)
 
-# DT vendor stub: empty dts folder is enough for pure Image builds
-if [[ -d arch/arm64/boot/dts/vendor ]] && [[ ! -f arch/arm64/boot/dts/vendor/Makefile ]]; then
-  printf '%s\n' '# Stub DT vendor tree' > arch/arm64/boot/dts/vendor/Makefile
-fi
-
-log "Oplus/vendor symlink stub fix complete"
+log "Oplus/vendor stub fix complete"
