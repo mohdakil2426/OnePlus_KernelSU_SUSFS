@@ -1,0 +1,39 @@
+# Stub on default branch (main) ONLY so GitHub Actions shows "Run workflow".
+# Official docs: workflow_dispatch UI requires the workflow file on the default branch.
+# https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow
+#
+# Real OP8 build lives on: op8series-sm8250-ksu-susfs
+# When running: set "Use workflow from" to that branch (YAML + code from there is used).
+# Do not develop OP8 features on main — this file is plumbing for the Actions UI.
+
+name: Build OP8 Series Kernel (SM8250)
+
+on:
+  workflow_dispatch:
+    inputs:
+      info:
+        description: 'Select branch op8series-sm8250-ksu-susfs under Use workflow from'
+        required: false
+        type: string
+        default: 'switch-to-op8series-branch'
+
+permissions:
+  contents: read
+
+jobs:
+  use-op8-branch:
+    name: Select OP8 branch (this is a main stub)
+    runs-on: ubuntu-latest
+    steps:
+      - name: How to run the real build
+        run: |
+          set -euo pipefail
+          cat <<'EOF'
+          ::error::This file on main only enables the Run workflow button.
+          Real build: Actions → this workflow → Run workflow →
+            "Use workflow from" = op8series-sm8250-ksu-susfs
+          Or CLI:
+            gh workflow run "Build OP8 Series Kernel (SM8250)" --ref op8series-sm8250-ksu-susfs -f build_mode=STOCK -f device_profile=ALL_OP8_SERIES -f kernel_branch=14 -f make_release=false
+          Docs: https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow
+          EOF
+          exit 1
