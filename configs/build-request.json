@@ -1,8 +1,8 @@
 {
-  "_comment": "Local notes / defaults only. CI does NOT auto-run on this file (manual workflow_dispatch only, same as main).",
+  "_comment": "Local notes only. CI is manual workflow_dispatch; use kernel_branch 14 or 13.1 in the Actions UI.",
   "build_mode": "STOCK",
   "device_profile": "ALL_OP8_SERIES",
-  "kernel_branch_override": "",
+  "kernel_branch": "14",
   "defconfig_override": "",
   "ksun_ref": "next",
   "susfs_ref": "kernel-4.19",

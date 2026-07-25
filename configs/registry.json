@@ -42,7 +42,7 @@
       "os_label": "A13.1-class",
       "devices": ["OP8", "OP8Pro", "OP8T", "OP9R"],
       "defconfig": "vendor/oplus-stock_defconfig",
-      "notes": "Optional older CLO tip; set via kernel_branch_override."
+      "notes": "Selectable in workflow (kernel_branch=13.1). Prefer for stock OOS 13 / 13.1-era phones."
     },
     "oos": {
       "android": null,

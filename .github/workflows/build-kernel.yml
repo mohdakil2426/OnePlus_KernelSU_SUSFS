@@ -32,13 +32,16 @@ on:
           - OP8Pro
           - OP8T
           - OP9R
-      kernel_branch_override:
-        description: 'Optional branch override (empty = preset default)'
-        required: false
-        type: string
-        default: ''
+      kernel_branch:
+        description: 'HELLBOY branch (14 = A14 default | 13.1 = A13.1 stock-era)'
+        required: true
+        type: choice
+        default: '14'
+        options:
+          - '14'
+          - '13.1'
       defconfig_override:
-        description: 'Optional defconfig override (empty = preset default)'
+        description: 'Optional defconfig override (empty = vendor/oplus-stock_defconfig)'
         required: false
         type: string
         default: ''
@@ -105,8 +108,17 @@ jobs:
           CLEAN="${{ inputs.clean_build }}"
           REL="${{ inputs.make_release }}"
           DBG="${{ inputs.debug }}"
-          BR_OVR="${{ inputs.kernel_branch_override }}"
+          # HELLBOY product tips only (Android-class lines)
+          KBRANCH="${{ inputs.kernel_branch }}"
           DC_OVR="${{ inputs.defconfig_override }}"
+
+          case "$KBRANCH" in
+            14|13.1) ;;
+            *)
+              echo "::error::Unsupported kernel_branch=$KBRANCH (allowed: 14, 13.1)"
+              exit 1
+              ;;
+          esac
 
           echo "build_mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "device_profile=$DEV" >> "$GITHUB_OUTPUT"
@@ -116,10 +128,10 @@ jobs:
           echo "make_release=$REL" >> "$GITHUB_OUTPUT"
           echo "debug=$DBG" >> "$GITHUB_OUTPUT"
 
-          # HELLBOY017 only → single-entry matrix
+          # HELLBOY017 only → single-entry matrix (branch from dispatch input)
           MATRIX=$(jq -c \
             --arg p "$PRESET" \
-            --arg br_ovr "${BR_OVR:-}" \
+            --arg kbranch "$KBRANCH" \
             --arg dc_ovr "${DC_OVR:-}" \
             '
             .[$p] as $S |
@@ -127,7 +139,7 @@ jobs:
               include: [{
                 preset: $p,
                 kernel_source: $S.kernel_source,
-                kernel_branch: (if $br_ovr != "" then $br_ovr else $S.kernel_branch end),
+                kernel_branch: $kbranch,
                 defconfig: (if $dc_ovr != "" then $dc_ovr else $S.defconfig end),
                 run_oplus_stubs: ($S.run_oplus_stubs // true | tostring),
                 disable_proprietary_oplus_configs: ($S.disable_proprietary_oplus_configs // false | tostring)
@@ -135,7 +147,7 @@ jobs:
             }
             ' "$SOURCES")
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
-          echo "Resolved matrix (HELLBOY017 only):"
+          echo "Resolved matrix (HELLBOY017 · branch $KBRANCH):"
           echo "$MATRIX" | jq .
           echo "clean_build=$CLEAN"
 
