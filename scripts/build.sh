@@ -137,6 +137,20 @@ fi
 
 make "${MAKE_ARGS[@]}" "$DEFCONFIG"
 
+# HELLBOY 13.1 / 13.1-new: arch/arm64/Kconfig prompts LITTLE_CPU_MASK / BIG_CPU_MASK
+# (int, no default) but vendor/oplus-stock_defconfig does not set them → conf hangs in
+# non-interactive CI ("Error in reading or end of file" loop). Branch 14 removed these
+# symbols. Values match same-tree vendor/kona-perf_defconfig (SM8250).
+# Applies whenever the symbols exist (13.1 and 13.1-new); no-op on 14.
+if [[ -f out/.config ]] && [[ -f arch/arm64/Kconfig ]] \
+  && grep -q '^config LITTLE_CPU_MASK' arch/arm64/Kconfig 2>/dev/null; then
+  log "Set LITTLE/BIG_CPU_MASK for noninteractive conf (13.1-class trees)"
+  ./scripts/config --file out/.config --set-val LITTLE_CPU_MASK 15
+  ./scripts/config --file out/.config --set-val BIG_CPU_MASK 112
+  grep -E 'CONFIG_(LITTLE|BIG)_CPU_MASK' out/.config || true
+  endgroup
+fi
+
 if [[ "$DISABLE_PROPRIETARY_OPLUS_CONFIGS" == "true" ]]; then
   log "Disable proprietary OPLUS configs (incomplete OSS trees)"
   if [[ -f out/.config ]]; then
