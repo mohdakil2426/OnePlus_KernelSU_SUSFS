@@ -33,13 +33,14 @@ on:
           - OP8T
           - OP9R
       kernel_branch:
-        description: 'HELLBOY branch (14 = A14 default | 13.1 = A13.1 stock-era)'
+        description: 'HELLBOY branch (14 = A14 default | 13.1 / 13.1-new = A13.1-class)'
         required: true
         type: choice
         default: '14'
         options:
           - '14'
           - '13.1'
+          - '13.1-new'
       defconfig_override:
         description: 'Optional defconfig override (empty = vendor/oplus-stock_defconfig)'
         required: false
@@ -113,9 +114,9 @@ jobs:
           DC_OVR="${{ inputs.defconfig_override }}"
 
           case "$KBRANCH" in
-            14|13.1) ;;
+            14|13.1|13.1-new) ;;
             *)
-              echo "::error::Unsupported kernel_branch=$KBRANCH (allowed: 14, 13.1)"
+              echo "::error::Unsupported kernel_branch=$KBRANCH (allowed: 14, 13.1, 13.1-new)"
               exit 1
               ;;
           esac

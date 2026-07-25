@@ -42,7 +42,14 @@
       "os_label": "A13.1-class",
       "devices": ["OP8", "OP8Pro", "OP8T", "OP9R"],
       "defconfig": "vendor/oplus-stock_defconfig",
-      "notes": "Selectable in workflow (kernel_branch=13.1). Prefer for stock OOS 13 / 13.1-era phones."
+      "notes": "Selectable (kernel_branch=13.1). Prefer for stock OOS 13 / 13.1-era phones."
+    },
+    "13.1-new": {
+      "android": 13,
+      "os_label": "A13.1-class (refreshed tip)",
+      "devices": ["OP8", "OP8Pro", "OP8T", "OP9R"],
+      "defconfig": "vendor/oplus-stock_defconfig",
+      "notes": "Selectable (kernel_branch=13.1-new). Newer experiment on 13.1 base (e.g. WLAN checkout)."
     },
     "oos": {
       "android": null,

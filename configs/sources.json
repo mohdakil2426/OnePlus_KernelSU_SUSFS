@@ -3,10 +3,10 @@
     "label": "HELLBOY017 Meteoric/CLO (stock-oriented)",
     "kernel_source": "https://github.com/HELLBOY017/kernel_oneplus_sm8250.git",
     "kernel_branch": "14",
-    "allowed_branches": ["14", "13.1"],
+    "allowed_branches": ["14", "13.1", "13.1-new"],
     "defconfig": "vendor/oplus-stock_defconfig",
     "run_oplus_stubs": true,
     "disable_proprietary_oplus_configs": false,
-    "notes": "Default branch 14 (A14-class). 13.1 = A13.1-class stock-era tip. Match branch to your OOS generation."
+    "notes": "Default 14 (A14-class). 13.1 / 13.1-new = A13.1-class tips. Match to your OOS generation."
   }
 }

@@ -26,9 +26,10 @@ Also selectable: **`13.1`**.
 |--------|-------------|
 | **`14`** | **Default** — A14-class stock-oriented CLO; STOCK verified |
 | **`13.1`** | A13.1-class — prefer for stock OOS 13 / 13.1-era |
+| **`13.1-new`** | A13.1-class refreshed tip (WLAN etc. experiments) |
 | `oos` | Older OOS-oriented (not in CI choices; research only) |
 
-Workflow input: `kernel_branch` = `14` | `13.1`.  
+Workflow input: `kernel_branch` = `14` | `13.1` | `13.1-new`.  
 **Not all branches boot all stock OOS builds** — match generation to your ROM.
 
 ---

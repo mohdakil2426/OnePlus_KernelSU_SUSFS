@@ -17,7 +17,7 @@ Build **STOCK**, **KernelSU-Next**, or **KernelSU-Next + SUSFS** kernels for the
 |-------|--------|
 | **Repo** | [HELLBOY017/kernel_oneplus_sm8250](https://github.com/HELLBOY017/kernel_oneplus_sm8250) |
 | **Default HELLBOY branch** | `14` (Android 14–class) |
-| **Also selectable** | `13.1` (Android 13.1–class) |
+| **Also selectable** | `13.1`, `13.1-new` (Android 13.1–class) |
 | **Default defconfig** | `vendor/oplus-stock_defconfig` |
 
 No LineageOS / OnePlusOSS / other trees — this git branch is **HELLBOY-only**.
@@ -74,7 +74,7 @@ gh workflow run "Build OP8 Series Kernel (SM8250)" \
 |-------|---------|
 | `build_mode` | `STOCK` / `KSUN` / `KSUN_SUSFS` |
 | `device_profile` | AnyKernel device check filter |
-| `kernel_branch` | **`14`** (default, A14) or **`13.1`** (A13.1) |
+| `kernel_branch` | **`14`** (default, A14) · **`13.1`** · **`13.1-new`** |
 | `defconfig_override` | Optional (empty = `vendor/oplus-stock_defconfig`) |
 | `ksun_ref` / `susfs_ref` | For root modes |
 | `clean_build` | `true` = no ccache |
