@@ -15,7 +15,8 @@ This builder **only** uses:
 
 **Not supported:** other kernel trees (LineageOS, OnePlusOSS, Realking, …), OnePlus 9/9 Pro (SM8350), OP7 series, OP10+ GKI devices.
 
-Default: branch **`14`**, defconfig **`vendor/oplus-stock_defconfig`**.
+Default: HELLBOY branch **`14`**, defconfig **`vendor/oplus-stock_defconfig`**.  
+Also selectable: **`13.1`**.
 
 ---
 
@@ -23,11 +24,12 @@ Default: branch **`14`**, defconfig **`vendor/oplus-stock_defconfig`**.
 
 | Branch | Typical use |
 |--------|-------------|
-| **`14`** | **Default** — stock-oriented CLO; STOCK verified |
-| `13.1` | Optional older tip (`kernel_branch_override`) |
-| `oos` | Older OOS-oriented tip (verify before use) |
+| **`14`** | **Default** — A14-class stock-oriented CLO; STOCK verified |
+| **`13.1`** | A13.1-class — prefer for stock OOS 13 / 13.1-era |
+| `oos` | Older OOS-oriented (not in CI choices; research only) |
 
-Override via workflow `kernel_branch_override` or `configs/build-request.json`.
+Workflow input: `kernel_branch` = `14` | `13.1`.  
+**Not all branches boot all stock OOS builds** — match generation to your ROM.
 
 ---
 

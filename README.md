@@ -16,12 +16,15 @@ Build **STOCK**, **KernelSU-Next**, or **KernelSU-Next + SUSFS** kernels for the
 | Field | Value |
 |-------|--------|
 | **Repo** | [HELLBOY017/kernel_oneplus_sm8250](https://github.com/HELLBOY017/kernel_oneplus_sm8250) |
-| **Default branch** | `14` |
+| **Default HELLBOY branch** | `14` (Android 14–class) |
+| **Also selectable** | `13.1` (Android 13.1–class) |
 | **Default defconfig** | `vendor/oplus-stock_defconfig` |
 
-No LineageOS / OnePlusOSS / other trees — this branch is **HELLBOY-only**.
+No LineageOS / OnePlusOSS / other trees — this git branch is **HELLBOY-only**.
 
-This branch is **not** for OP10+ GKI devices. Upstream multi-device WildKernels GKI pipeline lives on **`main`** (reference only; do not develop OP8 work there).
+Match **HELLBOY branch ≈ your stock OOS generation** (`14` for OOS14-class, `13.1` for OOS13.1-class). Not every branch boots every ROM.
+
+This git branch is **not** for OP10+ GKI devices. Upstream multi-device WildKernels GKI pipeline lives on **`main`** (reference only; do not develop OP8 features there).
 
 ---
 
@@ -41,19 +44,38 @@ This branch is **not** for OP10+ GKI devices. Upstream multi-device WildKernels 
 
 ## Build (GitHub Actions)
 
-**Manual only** — same as upstream `main` (`workflow_dispatch` only).  
-No automatic run on push, PR, or schedule.
+**Manual only** (`workflow_dispatch`). No automatic run on push, PR, or schedule.
 
-1. Stay on branch **`op8series-sm8250-ksu-susfs`** (never push OP8 work to `main`).
-2. Open **Actions** → **Build OP8 Series Kernel (SM8250)**.
-3. Click **Run workflow**, pick inputs, start.
+### How to run (UI)
+
+GitHub only shows **Run workflow** if a same-named workflow file exists on the **default branch** (`main`). A tiny stub lives on `main` for that; the **real build** is on this branch.
+
+1. Open **Actions** → **Build OP8 Series Kernel (SM8250)**.
+2. Click **Run workflow** (right side).
+3. **Use workflow from:** select **`op8series-sm8250-ksu-susfs`** (important — not `main`).
+4. Set inputs → **Run workflow**.
+
+If you leave **Use workflow from = main**, the stub job exits with instructions (no kernel build).
+
+### CLI (always works)
+
+```bash
+gh workflow run "Build OP8 Series Kernel (SM8250)" \
+  --ref op8series-sm8250-ksu-susfs \
+  -f build_mode=STOCK \
+  -f device_profile=ALL_OP8_SERIES \
+  -f kernel_branch=14 \
+  -f make_release=false \
+  -f clean_build=false \
+  -f debug=true
+```
 
 | Input | Purpose |
 |-------|---------|
 | `build_mode` | `STOCK` / `KSUN` / `KSUN_SUSFS` |
 | `device_profile` | AnyKernel device check filter |
-| `kernel_branch_override` | Optional HELLBOY branch (empty = `14`) |
-| `defconfig_override` | Optional defconfig (empty = `vendor/oplus-stock_defconfig`) |
+| `kernel_branch` | **`14`** (default, A14) or **`13.1`** (A13.1) |
+| `defconfig_override` | Optional (empty = `vendor/oplus-stock_defconfig`) |
 | `ksun_ref` / `susfs_ref` | For root modes |
 | `clean_build` | `true` = no ccache |
 | `make_release` | Publish a GitHub Release |
