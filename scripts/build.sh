@@ -74,13 +74,18 @@ if [[ -n "$COMPANION_SOURCE" || -n "$COMPANION_BRANCH" ]]; then
     none)
       ;;
     oneplusoss-sm8250-strict-prototypes)
-      KERNEL_PATCH_FILE="$ROOT_DIR/patches/oneplusoss-sm8250-genksyms.patch"
+      KERNEL_PATCH_FILES=(
+        "$ROOT_DIR/patches/oneplusoss-sm8250-genksyms.patch"
+        "$ROOT_DIR/patches/oneplusoss-sm8250-rtic-bss.patch"
+      )
       COMPANION_PATCH_FILE="$ROOT_DIR/patches/oneplusoss-sm8250-strict-prototypes.patch"
-      [[ -f "$KERNEL_PATCH_FILE" ]] || die "source patch not found: $KERNEL_PATCH_FILE"
       [[ -f "$COMPANION_PATCH_FILE" ]] || die "source patch not found: $COMPANION_PATCH_FILE"
       # OnePlus publishes affected sources with mixed CRLF/LF endings.
-      git -C "$KERNEL_DIR" apply --check --unidiff-zero --ignore-space-change "$KERNEL_PATCH_FILE"
-      git -C "$KERNEL_DIR" apply --unidiff-zero --ignore-space-change "$KERNEL_PATCH_FILE"
+      for kernel_patch_file in "${KERNEL_PATCH_FILES[@]}"; do
+        [[ -f "$kernel_patch_file" ]] || die "source patch not found: $kernel_patch_file"
+        git -C "$KERNEL_DIR" apply --check --unidiff-zero --ignore-space-change "$kernel_patch_file"
+        git -C "$KERNEL_DIR" apply --unidiff-zero --ignore-space-change "$kernel_patch_file"
+      done
       git -C "$COMPANION_DIR" apply --check --ignore-space-change "$COMPANION_PATCH_FILE"
       git -C "$COMPANION_DIR" apply --ignore-space-change "$COMPANION_PATCH_FILE"
       echo "Applied source patch set: $SOURCE_PATCH_SET"

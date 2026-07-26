@@ -23,7 +23,7 @@ This builder lets you select one source preset per manual workflow run:
 
 **Not supported:** OnePlus 9/9 Pro (SM8350), OP7 series, OP10+ GKI devices.
 
-Community `STOCK` presets do not alter the selected kernel source or defconfig. Official `ONEPLUSOSS_*` presets apply the audited `oneplusoss-sm8250-strict-prototypes` compatibility set and are stock-derived; it repairs two strict-prototype violations plus the invalid `__packed` return-type annotation that breaks GSI symbol-version generation. Their defconfig remains unchanged. `KSUN` and `KSUN_SUSFS` add only KernelSU-Next and SUSFS integration changes.
+Community `STOCK` presets do not alter the selected kernel source or defconfig. Official `ONEPLUSOSS_*` presets apply the audited `oneplusoss-sm8250-strict-prototypes` compatibility set and are stock-derived; it repairs two strict-prototype violations, the invalid `__packed` return-type annotation that breaks GSI symbol-version generation, and the misplaced RTIC BSS output section. Their defconfig remains unchanged. `KSUN` and `KSUN_SUSFS` add only KernelSU-Next and SUSFS integration changes.
 
 Official presets use the same-named branch from both [the kernel repository](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250) and [the companion modules/device-tree repository](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8250). A kernel-only clone is incomplete because its relative symlinks expect the companion `vendor/` and `kernel/msm-4.19/techpack/` trees in the shared source workspace.
 
