@@ -2,7 +2,7 @@ diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
 index 86a57e2..40839cb 100644
 --- a/arch/arm64/kernel/vmlinux.lds.S
 +++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -82,0 +83,3 @@
+@@ -97,0 +98,3 @@
 +#undef BSS_FIRST_SECTIONS
 +#define BSS_FIRST_SECTIONS RTIC_BSS
 +
