@@ -301,29 +301,62 @@ VERSION=$(grep '^VERSION *=' Makefile | awk '{print $3}')
 PATCHLEVEL=$(grep '^PATCHLEVEL *=' Makefile | awk '{print $3}')
 SUBLEVEL=$(grep '^SUBLEVEL *=' Makefile | awk '{print $3}')
 FULL_KVER="$VERSION.$PATCHLEVEL.$SUBLEVEL"
-BRANCH_SAFE="${KERNEL_BRANCH//\//_}"
-PRESET_SAFE="${SOURCE_PRESET//\//_}"
-STAMP="$(date -u +%Y%m%d_%H%M%S)"
-ZIP_NAME="OP8Series_${PRESET_SAFE}_${BUILD_MODE}_${BRANCH_SAFE}_${FULL_KVER}_${STAMP}.zip"
+
+KSUN_REVISION=
+KSUN_VERSION=
+SUSFS_REVISION=
+SUSFS_VERSION=
+if [[ "$ENABLE_KSUN" == "true" ]]; then
+  KSUN_REVISION="$(<"$KERNEL_DIR/.ksun-revision")"
+  KSUN_VERSION="$(
+    git -C "$KERNEL_DIR/KernelSU-Next" describe --tags --always 2>/dev/null ||
+      printf '%s' "$KSUN_REVISION"
+  )"
+fi
+if [[ "$ENABLE_SUSFS" == "true" ]]; then
+  SUSFS_REVISION="$(<"$KERNEL_DIR/.susfs-revision")"
+  SUSFS_VERSION="$(<"$KERNEL_DIR/.susfs-version")"
+fi
+
+ZIP_NAME="$(
+  DEVICE_PROFILE="$DEVICE_PROFILE" \
+  SOURCE_PRESET="$SOURCE_PRESET" \
+  BUILD_MODE="$BUILD_MODE" \
+  KERNEL_VERSION="$FULL_KVER" \
+  SUSFS_VERSION="$SUSFS_VERSION" \
+    bash "$SCRIPT_DIR/generate-package-name.sh"
+)"
+ARTIFACT_NAME="$(
+  DEVICE_PROFILE="$DEVICE_PROFILE" \
+  SOURCE_PRESET="$SOURCE_PRESET" \
+  BUILD_MODE="$BUILD_MODE" \
+  KERNEL_VERSION="$FULL_KVER" \
+  SUSFS_VERSION="$SUSFS_VERSION" \
+  OUTPUT_KIND=artifact \
+    bash "$SCRIPT_DIR/generate-package-name.sh"
+)"
 
 log "Package AnyKernel3"
 export KERNEL_DIR OUT_DIR="$KERNEL_DIR/out" ZIP_NAME DEVICE_PROFILE ARTIFACT_DIR
 bash "$SCRIPT_DIR/package-anykernel.sh"
 endgroup
 
-KSUN_REVISION=
-SUSFS_REVISION=
-SUSFS_VERSION=
 ANYKERNEL_REVISION="$(<"$ARTIFACT_DIR/anykernel-revision.txt")"
-[[ "$ENABLE_KSUN" != "true" ]] || KSUN_REVISION="$(<.ksun-revision)"
-if [[ "$ENABLE_SUSFS" == "true" ]]; then
-  SUSFS_REVISION="$(<.susfs-revision)"
-  SUSFS_VERSION="$(<.susfs-version)"
-fi
 IMAGE_SHA256="$(sha256sum "$ARTIFACT_DIR/Image" | awk '{print $1}')"
 ZIP_SHA256="$(sha256sum "$ARTIFACT_DIR/$ZIP_NAME" | awk '{print $1}')"
+printf '%s  %s\n' "$ZIP_SHA256" "$ZIP_NAME" \
+  > "$ARTIFACT_DIR/$ZIP_NAME.sha256"
+
+BUILDER_REVISION="$(git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
+WORKFLOW_RUN=
+if [[ -n "${GITHUB_SERVER_URL:-}" &&
+      -n "${GITHUB_REPOSITORY:-}" &&
+      -n "${GITHUB_RUN_ID:-}" ]]; then
+  WORKFLOW_RUN="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+fi
 
 {
+  echo "builder_revision=$BUILDER_REVISION"
   echo "source_preset=$SOURCE_PRESET"
   echo "kernel_source=$KERNEL_SOURCE"
   echo "kernel_branch=$KERNEL_BRANCH"
@@ -338,8 +371,10 @@ ZIP_SHA256="$(sha256sum "$ARTIFACT_DIR/$ZIP_NAME" | awk '{print $1}')"
   echo "defconfig=$DEFCONFIG"
   echo "device_profile=$DEVICE_PROFILE"
   echo "kernel_version=$FULL_KVER"
+  echo "clean_build=$CLEAN_BUILD"
   echo "ksun_ref=$KSUN_REF"
   echo "ksun_revision=$KSUN_REVISION"
+  echo "ksun_version=$KSUN_VERSION"
   echo "susfs_ref=$SUSFS_REF"
   echo "susfs_revision=$SUSFS_REVISION"
   echo "susfs_version=$SUSFS_VERSION"
@@ -347,12 +382,20 @@ ZIP_SHA256="$(sha256sum "$ARTIFACT_DIR/$ZIP_NAME" | awk '{print $1}')"
   echo "image_sha256=$IMAGE_SHA256"
   echo "zip_sha256=$ZIP_SHA256"
   echo "zip_name=$ZIP_NAME"
+  echo "artifact_name=$ARTIFACT_NAME"
+  echo "workflow_run=$WORKFLOW_RUN"
+  echo "build_completed_utc=$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 } | tee "$ARTIFACT_DIR/build-info.txt"
+
+BUILD_INFO_FILE="$ARTIFACT_DIR/build-info.txt" \
+SUMMARY_FILE="$ARTIFACT_DIR/build-summary.md" \
+  bash "$SCRIPT_DIR/generate-build-summary.sh"
 
 # Export for GitHub Actions
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   {
     echo "zip_name=$ZIP_NAME"
+    echo "artifact_name=$ARTIFACT_NAME"
     echo "kernel_version=$FULL_KVER"
     echo "image_path=$ARTIFACT_DIR/Image"
   } >> "$GITHUB_OUTPUT"
