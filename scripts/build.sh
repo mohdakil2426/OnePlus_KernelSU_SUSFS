@@ -33,8 +33,8 @@ DEFCONFIG="${DEFCONFIG:-vendor/oplus-stock_defconfig}"
 DEVICE_PROFILE="${DEVICE_PROFILE:-ALL_OP8_SERIES}"
 SOURCE_PRESET="${SOURCE_PRESET:-HELLBOY017}"
 CLEAN_BUILD="${CLEAN_BUILD:-false}"
-KSUN_REF="${KSUN_REF:-next}"
-SUSFS_REF="${SUSFS_REF:-kernel-4.19}"
+KSUN_REF="${KSUN_REF:-53791c92bff13d62338f29cc9da035a37652ca91}"
+SUSFS_REF="${SUSFS_REF:-001e69919c6271f690fd00b17e4c721c9e599152}"
 JOBS="${JOBS:-$(nproc)}"
 WORK_DIR="${WORK_DIR:-$ROOT_DIR/work}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$ROOT_DIR/artifacts}"
@@ -69,6 +69,8 @@ if [[ -n "$COMPANION_SOURCE" || -n "$COMPANION_BRANCH" ]]; then
   mkdir -p "$(dirname "$KERNEL_DIR")"
   git clone --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_SOURCE" "$KERNEL_DIR"
   git clone --depth=1 -b "$COMPANION_BRANCH" "$COMPANION_SOURCE" "$COMPANION_DIR"
+  SOURCE_REVISION="$(git -C "$KERNEL_DIR" rev-parse HEAD)"
+  COMPANION_REVISION="$(git -C "$COMPANION_DIR" rev-parse HEAD)"
 
   case "$SOURCE_PATCH_SET" in
     none)
@@ -109,22 +111,15 @@ else
   log "Clone kernel $KERNEL_SOURCE @ $KERNEL_BRANCH"
   rm -rf "$KERNEL_DIR"
   git clone --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_SOURCE" "$KERNEL_DIR"
+  SOURCE_REVISION="$(git -C "$KERNEL_DIR" rev-parse HEAD)"
+  COMPANION_REVISION=
   endgroup
 fi
 
 if [[ "$ENABLE_KSUN" == "true" ]]; then
   log "KernelSU-Next"
   export KSUN_REF KERNEL_DIR
-  if [[ "$ENABLE_SUSFS" == "true" ]]; then
-    export FORCE_NO_KPROBE=true
-  else
-    export FORCE_NO_KPROBE=false
-  fi
   bash "$SCRIPT_DIR/apply-ksun.sh"
-  endgroup
-
-  log "Manual non-GKI hooks"
-  ( cd "$KERNEL_DIR" && bash "$SCRIPT_DIR/add-manual-hooks.sh" )
   endgroup
 fi
 
@@ -132,6 +127,13 @@ if [[ "$ENABLE_SUSFS" == "true" ]]; then
   log "SUSFS (kernel-4.19)"
   export SUSFS_REF KERNEL_DIR WORK_DIR
   bash "$SCRIPT_DIR/apply-susfs.sh"
+  endgroup
+fi
+
+if [[ "$ENABLE_KSUN" == "true" ]]; then
+  log "Manual non-GKI hooks"
+  export KERNEL_DIR
+  bash "$SCRIPT_DIR/add-manual-hooks.sh"
   endgroup
 fi
 
@@ -217,9 +219,11 @@ make "${MAKE_ARGS[@]}" "$DEFCONFIG"
 # Re-open configure group for remaining config tweaks
 log "Apply optional KSU/SUSFS config symbols"
 if [[ "$ENABLE_KSUN" == "true" ]]; then
-  ./scripts/config --file out/.config -e KSU || true
-  ./scripts/config --file out/.config -e KALLSYMS || true
-  ./scripts/config --file out/.config -e KALLSYMS_ALL || true
+  ./scripts/config --file out/.config -e KSU
+  ./scripts/config --file out/.config -e KSU_MANUAL_HOOK
+  ./scripts/config --file out/.config -d KSU_KPROBES_HOOK
+  ./scripts/config --file out/.config -e KALLSYMS
+  ./scripts/config --file out/.config -e KALLSYMS_ALL
 fi
 
 if [[ "$ENABLE_SUSFS" == "true" ]]; then
@@ -230,6 +234,7 @@ if [[ "$ENABLE_SUSFS" == "true" ]]; then
     KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT \
     KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT \
     KSU_SUSFS_SUS_KSTAT \
+    KSU_SUSFS_SUS_OVERLAYFS \
     KSU_SUSFS_TRY_UMOUNT \
     KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT \
     KSU_SUSFS_SPOOF_UNAME \
@@ -239,14 +244,37 @@ if [[ "$ENABLE_SUSFS" == "true" ]]; then
     KSU_SUSFS_OPEN_REDIRECT \
     KSU_SUSFS_HAS_MAGIC_MOUNT
   do
-    ./scripts/config --file out/.config -e "$opt" || true
+    ./scripts/config --file out/.config -e "$opt"
   done
 fi
 
 if [[ "$ENABLE_KSUN" == "true" || "$ENABLE_SUSFS" == "true" ]]; then
   make "${MAKE_ARGS[@]}" olddefconfig
 fi
-grep -E 'CONFIG_KSU|CONFIG_KSU_SUSFS' out/.config | head -40 || true
+if [[ "$ENABLE_KSUN" == "true" ]]; then
+  grep -Fxq 'CONFIG_KSU=y' out/.config || die "CONFIG_KSU is not enabled"
+  grep -Fxq 'CONFIG_KSU_MANUAL_HOOK=y' out/.config ||
+    die "KernelSU manual hook mode is not enabled"
+  ! grep -Fxq 'CONFIG_KSU_KPROBES_HOOK=y' out/.config ||
+    die "KernelSU kprobe hook mode was not disabled"
+fi
+if [[ "$ENABLE_SUSFS" == "true" ]]; then
+  for opt in \
+    KSU_SUSFS \
+    KSU_SUSFS_SUS_PATH \
+    KSU_SUSFS_SUS_MOUNT \
+    KSU_SUSFS_SUS_KSTAT \
+    KSU_SUSFS_SUS_OVERLAYFS \
+    KSU_SUSFS_TRY_UMOUNT \
+    KSU_SUSFS_SPOOF_UNAME \
+    KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
+    KSU_SUSFS_OPEN_REDIRECT
+  do
+    grep -Fxq "CONFIG_${opt}=y" out/.config ||
+      die "CONFIG_${opt} is not enabled"
+  done
+fi
+grep -E 'CONFIG_KSU|CONFIG_KSU_SUSFS' out/.config | head -60
 endgroup
 
 log "Compile Image (jobs=$JOBS)"
@@ -283,12 +311,26 @@ export KERNEL_DIR OUT_DIR="$KERNEL_DIR/out" ZIP_NAME DEVICE_PROFILE ARTIFACT_DIR
 bash "$SCRIPT_DIR/package-anykernel.sh"
 endgroup
 
+KSUN_REVISION=
+SUSFS_REVISION=
+SUSFS_VERSION=
+ANYKERNEL_REVISION="$(<"$ARTIFACT_DIR/anykernel-revision.txt")"
+[[ "$ENABLE_KSUN" != "true" ]] || KSUN_REVISION="$(<.ksun-revision)"
+if [[ "$ENABLE_SUSFS" == "true" ]]; then
+  SUSFS_REVISION="$(<.susfs-revision)"
+  SUSFS_VERSION="$(<.susfs-version)"
+fi
+IMAGE_SHA256="$(sha256sum "$ARTIFACT_DIR/Image" | awk '{print $1}')"
+ZIP_SHA256="$(sha256sum "$ARTIFACT_DIR/$ZIP_NAME" | awk '{print $1}')"
+
 {
   echo "source_preset=$SOURCE_PRESET"
   echo "kernel_source=$KERNEL_SOURCE"
   echo "kernel_branch=$KERNEL_BRANCH"
+  echo "kernel_source_revision=$SOURCE_REVISION"
   echo "companion_source=$COMPANION_SOURCE"
   echo "companion_branch=$COMPANION_BRANCH"
+  echo "companion_source_revision=$COMPANION_REVISION"
   echo "toolchain_profile=$TOOLCHAIN_PROFILE"
   echo "source_patch_set=$SOURCE_PATCH_SET"
   echo "native_feature_profile=$NATIVE_FEATURE_PROFILE"
@@ -297,7 +339,13 @@ endgroup
   echo "device_profile=$DEVICE_PROFILE"
   echo "kernel_version=$FULL_KVER"
   echo "ksun_ref=$KSUN_REF"
+  echo "ksun_revision=$KSUN_REVISION"
   echo "susfs_ref=$SUSFS_REF"
+  echo "susfs_revision=$SUSFS_REVISION"
+  echo "susfs_version=$SUSFS_VERSION"
+  echo "anykernel_revision=$ANYKERNEL_REVISION"
+  echo "image_sha256=$IMAGE_SHA256"
+  echo "zip_sha256=$ZIP_SHA256"
   echo "zip_name=$ZIP_NAME"
 } | tee "$ARTIFACT_DIR/build-info.txt"
 

@@ -16,7 +16,7 @@ on:
         description: 'STOCK = no root | KSUN | KSUN_SUSFS'
         required: true
         type: choice
-        default: 'STOCK'
+        default: 'KSUN_SUSFS'
         options:
           - STOCK
           - KSUN
@@ -25,7 +25,7 @@ on:
         description: 'AnyKernel device codenames'
         required: true
         type: choice
-        default: 'ALL_OP8_SERIES'
+        default: 'OP8'
         options:
           - ALL_OP8_SERIES
           - OP8
@@ -36,7 +36,7 @@ on:
         description: 'Kernel source preset'
         required: true
         type: choice
-        default: 'HELLBOY017'
+        default: 'ONEPLUSOSS_OP8_OOS13_1'
         options:
           - HELLBOY017
           - PPAJDA
@@ -59,16 +59,16 @@ on:
         description: 'KernelSU-Next ref (KSUN modes)'
         required: false
         type: string
-        default: 'next'
+        default: '53791c92bff13d62338f29cc9da035a37652ca91'
       susfs_ref:
         description: 'SUSFS ref (KSUN_SUSFS)'
         required: false
         type: string
-        default: 'kernel-4.19'
+        default: '001e69919c6271f690fd00b17e4c721c9e599152'
       clean_build:
         description: 'Clean build (no ccache)'
         type: boolean
-        default: false
+        default: true
       make_release:
         description: 'Create GitHub Release'
         required: true
@@ -111,8 +111,8 @@ jobs:
 
           MODE="${{ inputs.build_mode }}"
           DEV="${{ inputs.device_profile }}"
-          KSUN="${{ inputs.ksun_ref || 'next' }}"
-          SUSFS="${{ inputs.susfs_ref || 'kernel-4.19' }}"
+          KSUN="${{ inputs.ksun_ref || '53791c92bff13d62338f29cc9da035a37652ca91' }}"
+          SUSFS="${{ inputs.susfs_ref || '001e69919c6271f690fd00b17e4c721c9e599152' }}"
           CLEAN="${{ inputs.clean_build }}"
           REL="${{ inputs.make_release }}"
           DBG="${{ inputs.debug }}"

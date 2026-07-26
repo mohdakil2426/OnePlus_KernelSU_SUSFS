@@ -43,7 +43,12 @@ This git branch is **not** for OP10+ GKI devices. Upstream multi-device WildKern
 | **KSUN** | [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) built-in (non-GKI 4.19) |
 | **KSUN_SUSFS** | KSUN + [SUSFS](https://gitlab.com/simonpunk/susfs4ksu) (`kernel-4.19`) |
 
-- Flashable **AnyKernel3** ZIP
+- The verified OP8 request pins KernelSU-Next `53791c92bff13d62338f29cc9da035a37652ca91`
+  (`v3.2.0-legacy-13-g53791c92`) and official SUSFS 4.19
+  `001e69919c6271f690fd00b17e4c721c9e599152` (`v1.5.5`).
+- Flashable **AnyKernel3** ZIP, using WildKernels framework commit
+  `e1e9dce98430c5c6f231f7094a8c7f4ecaf50948` plus a repo-owned,
+  OP8-only non-GKI installer.
 - **ccache** via GitHub release bucket `ccache-cache` (same pattern as upstream author on `main`, adapted here)
 - Manual GitHub Actions control on this branch only
 
@@ -69,9 +74,12 @@ If you leave **Use workflow from = main**, the stub job exits with instructions 
 ```bash
 gh workflow run "Build OP8 Series Kernel (SM8250)" \
   --ref op8series-sm8250-ksu-susfs \
-  -f build_mode=STOCK \
+  -f build_mode=KSUN_SUSFS \
   -f device_profile=OP8 \
-  -f source_preset=PPAJDA \
+  -f source_preset=ONEPLUSOSS_OP8_OOS13_1 \
+  -f kernel_branch=oneplus/sm8250_t_13.1_op8 \
+  -f ksun_ref=53791c92bff13d62338f29cc9da035a37652ca91 \
+  -f susfs_ref=001e69919c6271f690fd00b17e4c721c9e599152 \
   -f make_release=false \
   -f clean_build=true \
   -f debug=true
@@ -121,6 +129,21 @@ bash scripts/build.sh
 
 For **KSUN_SUSFS**: install a SUSFS userspace module (e.g. [sidex15/susfs4ksu-module](https://github.com/sidex15/susfs4ksu-module)) after root works.
 
+### Kernel changes and boot risk
+
+| Change | Kernel-level effect | Main risk | Current evidence |
+|--------|---------------------|-----------|------------------|
+| OnePlus compatibility set | Repairs invalid prototypes, GSI symbol generation, and RTIC BSS placement without changing the defconfig | Low, but still changes compiled source | Clean STOCK CI baseline passed |
+| KernelSU-Next manual hooks | Hooks exec/open/read/stat, input safe mode, reboot supercall, and the 4.19 unmount path | Medium; a wrong hook placement can panic or break early userspace | Exact-tree compile and link passed locally |
+| SUSFS v1.5.5 | Changes VFS, mount namespace, proc/fdinfo, stat, uname, and task state paths | Medium to high; OEM-port mistakes can cause boot or runtime faults | Rebased patch applies cleanly; SUSFS and final Image link passed locally |
+| Current-KSU/SUSFS bridge | Connects the official SUSFS 4.19 ABI to the current KernelSU-Next layout | Medium; ABI mismatch can break root/SUSFS behavior | Contract tests and exact-tree compile/link passed locally |
+| OP8 AnyKernel installer | Replaces the active-slot `boot` kernel only for `instantnoodle` | High if flashed on the wrong ROM/device or without a backup | ZIP validator passed; no physical-device flash test yet |
+
+Build success proves compilation and package structure, **not** boot safety. Keep a
+known-good stock `boot.img`, verify the installed ROM is OP8 OOS 13.1-compatible,
+and test with a recoverable flashing method. The KernelSU input safe-mode hook is
+included, but it cannot recover every early boot failure.
+
 ---
 
 ## Repo layout (this branch)
@@ -135,6 +158,7 @@ scripts/apply-ksun.sh
 scripts/apply-susfs.sh
 scripts/add-manual-hooks.sh
 scripts/package-anykernel.sh
+scripts/verify-anykernel.sh
 .github/workflows/build-kernel.yml
 .github/actions/cache/        # ccache restore/save (author pattern from main)
 ```

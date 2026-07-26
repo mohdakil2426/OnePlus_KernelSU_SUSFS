@@ -1,67 +1,47 @@
 #!/usr/bin/env bash
-# Package Image into AnyKernel3 zip for OP8 series.
-# Env:
-#   KERNEL_DIR, OUT_DIR, ZIP_NAME, DEVICE_PROFILE
-#   DEVICE_PROFILE: ALL_OP8_SERIES | OP8 | OP8Pro | OP8T | OP9R
 
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 KERNEL_DIR="${KERNEL_DIR:-.}"
 OUT_DIR="${OUT_DIR:-$KERNEL_DIR/out}"
-DEVICE_PROFILE="${DEVICE_PROFILE:-ALL_OP8_SERIES}"
-ZIP_NAME="${ZIP_NAME:-OP8Series_kernel.zip}"
+ZIP_NAME="${ZIP_NAME:-OP8_kernel.zip}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-.}"
+DEVICE_PROFILE="${DEVICE_PROFILE:-OP8}"
+ANYKERNEL_REPO="${ANYKERNEL_REPO:-https://github.com/WildKernels/AnyKernel3.git}"
+ANYKERNEL_REF="${ANYKERNEL_REF:-e1e9dce98430c5c6f231f7094a8c7f4ecaf50948}"
+
+die() { echo "error: $*" >&2; exit 1; }
+
+[[ "$DEVICE_PROFILE" == "OP8" ]] ||
+  die "this verified installer is intentionally restricted to DEVICE_PROFILE=OP8"
+[[ "$ANYKERNEL_REF" =~ ^[0-9a-f]{40}$ ]] ||
+  die "ANYKERNEL_REF must be a full immutable commit SHA"
 
 IMAGE="$OUT_DIR/arch/arm64/boot/Image"
-if [[ ! -f "$IMAGE" ]]; then
-  echo "error: missing $IMAGE" >&2
-  exit 1
-fi
+[[ -s "$IMAGE" ]] || die "missing or empty $IMAGE"
 
-rm -rf "$KERNEL_DIR/AnyKernel3"
-git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git "$KERNEL_DIR/AnyKernel3"
-cd "$KERNEL_DIR/AnyKernel3"
-rm -rf .git modules patch ramdisk
+PACKAGE_DIR="$KERNEL_DIR/AnyKernel3"
+rm -rf "$PACKAGE_DIR"
+git clone --filter=blob:none --no-checkout "$ANYKERNEL_REPO" "$PACKAGE_DIR"
+git -C "$PACKAGE_DIR" checkout --detach "$ANYKERNEL_REF"
+RESOLVED="$(git -C "$PACKAGE_DIR" rev-parse HEAD)"
+[[ "$RESOLVED" == "$ANYKERNEL_REF" ]] ||
+  die "AnyKernel revision mismatch: expected $ANYKERNEL_REF, got $RESOLVED"
 
-cp "$IMAGE" .
-[[ -f "$OUT_DIR/arch/arm64/boot/dtb" ]] && cp "$OUT_DIR/arch/arm64/boot/dtb" . || true
-[[ -f "$OUT_DIR/arch/arm64/boot/dtbo.img" ]] && cp "$OUT_DIR/arch/arm64/boot/dtbo.img" . || true
-
-# Device codenames for OnePlus 8 series
-case "$DEVICE_PROFILE" in
-  OP8)
-    NAMES=(instantnoodle)
-    ;;
-  OP8Pro)
-    NAMES=(instantnoodlep)
-    ;;
-  OP8T)
-    NAMES=(kebab lemonkebab)
-    ;;
-  OP9R)
-    NAMES=(lemonades lemonade)
-    ;;
-  ALL_OP8_SERIES|*)
-    NAMES=(instantnoodle instantnoodlep kebab lemonkebab lemonades lemonade)
-    ;;
-esac
-
-sed -i 's/do.devicecheck=.*/do.devicecheck=1;/g' anykernel.sh
-sed -i 's/do.modules=.*/do.modules=0;/g' anykernel.sh
-sed -i 's|block=.*|block=/dev/block/bootdevice/by-name/boot;|g' anykernel.sh
-sed -i 's/is_slot_device=.*/is_slot_device=1;/g' anykernel.sh
-
-# Clear default device.nameN then set ours
-sed -i '/device\.name[0-9]=/d' anykernel.sh
-idx=1
-for n in "${NAMES[@]}"; do
-  # Insert after do.devicecheck line
-  sed -i "/do.devicecheck=/a device.name${idx}=${n};" anykernel.sh
-  idx=$((idx + 1))
-done
+rm -rf "$PACKAGE_DIR/.git" "$PACKAGE_DIR/modules" "$PACKAGE_DIR/patch" \
+  "$PACKAGE_DIR/ramdisk"
+cp "$ROOT_DIR/assets/anykernel-op8.sh" "$PACKAGE_DIR/anykernel.sh"
+cp "$IMAGE" "$PACKAGE_DIR/Image"
 
 mkdir -p "$ARTIFACT_DIR"
-zip -r9 "$ARTIFACT_DIR/$ZIP_NAME" . -x '.git/*' 'README.md' '*placeholder'
+(
+  cd "$PACKAGE_DIR"
+  zip -qr9 "$ARTIFACT_DIR/$ZIP_NAME" . \
+    -x 'README.md' '*placeholder' '*.git*'
+)
 cp "$IMAGE" "$ARTIFACT_DIR/Image"
 
-echo "Packaged $ARTIFACT_DIR/$ZIP_NAME"
+bash "$ROOT_DIR/scripts/verify-anykernel.sh" "$ARTIFACT_DIR/$ZIP_NAME"
+printf '%s\n' "$RESOLVED" > "$ARTIFACT_DIR/anykernel-revision.txt"
+echo "Packaged and verified $ARTIFACT_DIR/$ZIP_NAME"

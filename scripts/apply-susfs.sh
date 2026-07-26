@@ -1,102 +1,77 @@
 #!/usr/bin/env bash
-# Apply susfs4ksu kernel-4.19 patches into current kernel tree.
-# Official non-GKI flow: https://gitlab.com/simonpunk/susfs4ksu (branch kernel-4.19)
-# Env:
-#   SUSFS_REF   - git branch/tag (default: kernel-4.19)
-#   KERNEL_DIR  - kernel root
-#   WORK_DIR    - where to clone susfs (default: parent of kernel)
+# Integrate official SUSFS v1.5.5 into the audited OnePlus 4.19 tree.
 
 set -euo pipefail
 
-SUSFS_REF="${SUSFS_REF:-kernel-4.19}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SUSFS_REPO="${SUSFS_REPO:-https://gitlab.com/simonpunk/susfs4ksu.git}"
+SUSFS_REF="${SUSFS_REF:-001e69919c6271f690fd00b17e4c721c9e599152}"
 KERNEL_DIR="${KERNEL_DIR:-.}"
 WORK_DIR="${WORK_DIR:-$(cd "$KERNEL_DIR/.." && pwd)}"
 
-cd "$KERNEL_DIR"
-KERNEL_DIR="$(pwd)"
-
+die() { echo "error: $*" >&2; exit 1; }
 log() { echo "[susfs] $*"; }
-warn() { echo "[susfs][warn] $*" >&2; }
 
-log "Cloning susfs4ksu @ $SUSFS_REF"
-rm -rf "$WORK_DIR/susfs4ksu"
-if ! git clone --depth=1 -b "$SUSFS_REF" https://gitlab.com/simonpunk/susfs4ksu.git "$WORK_DIR/susfs4ksu"; then
-  warn "GitLab clone failed; trying GitHub mirror"
-  git clone --depth=1 -b "$SUSFS_REF" https://github.com/sidex15/susfs4ksu.git "$WORK_DIR/susfs4ksu" \
-    || git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git "$WORK_DIR/susfs4ksu"
-fi
+[[ "$SUSFS_REF" =~ ^[0-9a-f]{40}$ ]] ||
+  die "SUSFS_REF must be a full immutable commit SHA, got: $SUSFS_REF"
 
-SUSFS="$WORK_DIR/susfs4ksu"
-PATCHES="$SUSFS/kernel_patches"
+KERNEL_DIR="$(cd "$KERNEL_DIR" && pwd)"
+SUSFS_DIR="$WORK_DIR/susfs4ksu"
+KSUN_DIR="$KERNEL_DIR/KernelSU-Next"
+KERNEL_PATCH="$ROOT_DIR/patches/oneplusoss-sm8250-susfs-4.19.patch"
+KSUN_PATCH="$ROOT_DIR/patches/ksun-current-susfs-v1.5.5.patch"
+KSUN_BRIDGE="$ROOT_DIR/assets/ksun-susfs-v1.5.5.c"
 
-if [[ ! -d "$PATCHES" ]]; then
-  echo "error: kernel_patches missing in susfs clone" >&2
-  exit 1
-fi
-
-# Copy sources
-log "Copying SUSFS fs/include sources"
-cp -v "$PATCHES"/fs/* "$KERNEL_DIR/fs/" 2>/dev/null || true
-cp -v "$PATCHES"/include/linux/* "$KERNEL_DIR/include/linux/" 2>/dev/null || true
-
-# Kernel patch
-KERNEL_PATCH=""
-for cand in \
-  "$PATCHES/50_add_susfs_in_kernel-4.19.patch" \
-  "$PATCHES/50_add_susfs_in_kernel.patch"
-do
-  if [[ -f "$cand" ]]; then
-    KERNEL_PATCH="$cand"
-    break
-  fi
+[[ -d "$KSUN_DIR/.git" ]] || die "KernelSU-Next must be integrated first"
+for required in "$KERNEL_PATCH" "$KSUN_PATCH" "$KSUN_BRIDGE"; do
+  [[ -f "$required" ]] || die "required integration file missing: $required"
 done
 
-if [[ -n "$KERNEL_PATCH" ]]; then
-  log "Applying $(basename "$KERNEL_PATCH") (best-effort)"
-  set +e
-  patch -p1 --no-backup-if-mismatch -F3 < "$KERNEL_PATCH" | tee /tmp/susfs_kernel_patch.log
-  PATCH_RC=${PIPESTATUS[0]}
-  set -e
-  if [[ $PATCH_RC -ne 0 ]]; then
-    warn "Kernel SUSFS patch returned $PATCH_RC — check /tmp/susfs_kernel_patch.log and .rej files"
-    find . -name '*.rej' -print | head -50 || true
-  fi
-else
-  warn "No 50_add_susfs_in_kernel* patch found"
+rm -rf "$SUSFS_DIR"
+log "Cloning official SUSFS @ $SUSFS_REF"
+git clone --filter=blob:none --no-checkout "$SUSFS_REPO" "$SUSFS_DIR"
+git -C "$SUSFS_DIR" checkout --detach "$SUSFS_REF"
+RESOLVED="$(git -C "$SUSFS_DIR" rev-parse HEAD)"
+[[ "$RESOLVED" == "$SUSFS_REF" ]] ||
+  die "SUSFS revision mismatch: expected $SUSFS_REF, got $RESOLVED"
+
+PATCH_ROOT="$SUSFS_DIR/kernel_patches"
+[[ -f "$PATCH_ROOT/fs/susfs.c" &&
+   -f "$PATCH_ROOT/include/linux/susfs.h" &&
+   -f "$PATCH_ROOT/include/linux/susfs_def.h" ]] ||
+  die "official SUSFS 4.19 sources are missing"
+grep -Fq '#define SUSFS_VERSION "v1.5.5"' \
+  "$PATCH_ROOT/include/linux/susfs.h" ||
+  die "unexpected SUSFS version at pinned revision"
+
+log "Copying official SUSFS source files"
+cp "$PATCH_ROOT"/fs/* "$KERNEL_DIR/fs/"
+cp "$PATCH_ROOT"/include/linux/* "$KERNEL_DIR/include/linux/"
+
+log "Applying audited OnePlus 4.19 kernel port"
+git -C "$KERNEL_DIR" apply --recount --check "$KERNEL_PATCH"
+git -C "$KERNEL_DIR" apply --recount "$KERNEL_PATCH"
+
+log "Applying current KernelSU-Next compatibility bridge"
+cp "$KSUN_BRIDGE" "$KSUN_DIR/kernel/feature/susfs_legacy.c"
+git -C "$KSUN_DIR" apply --recount --check "$KSUN_PATCH"
+git -C "$KSUN_DIR" apply --recount "$KSUN_PATCH"
+
+if find "$KERNEL_DIR" "$KSUN_DIR" \
+  \( -name '*.rej' -o -name '*.orig' \) -print -quit | grep -q .; then
+  find "$KERNEL_DIR" "$KSUN_DIR" \
+    \( -name '*.rej' -o -name '*.orig' \) -print >&2
+  die "SUSFS integration produced reject/backup files"
 fi
 
-# Ensure susfs.o in fs/Makefile
-if [[ -f fs/Makefile ]] && ! grep -q 'susfs.o' fs/Makefile; then
-  log "Adding susfs.o to fs/Makefile"
-  echo 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' >> fs/Makefile
-fi
+grep -Fq 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' "$KERNEL_DIR/fs/Makefile" ||
+  die "SUSFS object is not registered"
+grep -Fq 'config KSU_SUSFS' "$KSUN_DIR/kernel/Kconfig" ||
+  die "KernelSU SUSFS Kconfig bridge is missing"
+grep -Fq 'LSM_HOOK_INIT(task_prctl, ksu_task_prctl)' \
+  "$KSUN_DIR/kernel/hook/lsm_hooks.c" ||
+  die "SUSFS userspace command hook is missing"
 
-# KernelSU driver SUSFS enable patch
-KSU_PARENT=""
-if [[ -L drivers/kernelsu ]]; then
-  KSU_PARENT="$(dirname "$(readlink -f drivers/kernelsu)")"
-elif [[ -d KernelSU-Next ]]; then
-  KSU_PARENT="KernelSU-Next"
-elif [[ -d KernelSU ]]; then
-  KSU_PARENT="KernelSU"
-elif [[ -d drivers/kernelsu ]]; then
-  KSU_PARENT="drivers/kernelsu"
-fi
-
-KSU_PATCH="$PATCHES/KernelSU/10_enable_susfs_for_ksu.patch"
-if [[ -n "$KSU_PARENT" && -f "$KSU_PATCH" && -d "$KSU_PARENT" ]]; then
-  log "Applying 10_enable_susfs_for_ksu.patch in $KSU_PARENT (best-effort)"
-  (
-    cd "$KSU_PARENT"
-    set +e
-    patch -p1 --no-backup-if-mismatch -F3 < "$KSU_PATCH" | tee /tmp/susfs_ksu_patch.log
-    set -e
-  ) || warn "KSU SUSFS patch had rejects — may need manual port for this KSUN version"
-else
-  warn "Skipping KernelSU SUSFS patch (parent or patch missing)"
-fi
-
-# Cleanup reject noise from workspace root (keep logs)
-find . -name '*.orig' -delete 2>/dev/null || true
-
-log "SUSFS apply step finished"
+printf '%s\n' "$RESOLVED" > "$KERNEL_DIR/.susfs-revision"
+printf '%s\n' 'v1.5.5' > "$KERNEL_DIR/.susfs-version"
+log "SUSFS integration complete: $RESOLVED (v1.5.5)"

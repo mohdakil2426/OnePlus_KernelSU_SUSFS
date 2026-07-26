@@ -53,6 +53,16 @@ Workflow input: select `source_preset`; leave `kernel_branch` empty to use its d
 | `KSUN` | KernelSU-Next | No | Root without SUSFS |
 | `KSUN_SUSFS` | KernelSU-Next | Yes (`kernel-4.19`) | Root + hide stack |
 
+The OP8 clean request is immutable: KernelSU-Next
+`53791c92bff13d62338f29cc9da035a37652ca91`
+(`v3.2.0-legacy-13-g53791c92`), official SUSFS 4.19
+`001e69919c6271f690fd00b17e4c721c9e599152` (`v1.5.5`), and WildKernels
+AnyKernel3 framework `e1e9dce98430c5c6f231f7094a8c7f4ecaf50948`.
+The current KernelSU repository no longer has the flat layout expected by the
+official SUSFS 4.19 patch, so this builder owns a small, fail-fast compatibility
+bridge and an exact OnePlus 4.19 rebase. Patch fuzz and rejected hunks are not
+accepted.
+
 ---
 
 ## Important warnings
@@ -63,6 +73,9 @@ Workflow input: select `source_preset`; leave `kernel_branch` empty to use its d
 4. **Unlocked bootloader**; disable verification when required.
 5. **OTA** may replace your kernel — re-flash after major updates.
 6. Always keep a **stock boot** backup.
+7. A green build validates `Image` generation and ZIP structure only. Physical
+   boot, display, modem, Wi-Fi, camera, charging, suspend, and recovery flashing
+   remain unverified until tested on the exact OP8/OOS combination.
 
 ---
 
