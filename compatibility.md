@@ -9,6 +9,10 @@ This builder lets you select one clean upstream source per manual workflow run:
 | `HELLBOY017` | [HELLBOY017/kernel_oneplus_sm8250](https://github.com/HELLBOY017/kernel_oneplus_sm8250) | `14` | `vendor/oplus-stock_defconfig` | OP8 series |
 | `PPAJDA` | [ppajda/android_kernel_oneplus_sm8250](https://github.com/ppajda/android_kernel_oneplus_sm8250) | `oos13.1` | `op8_defconfig` | OP8 / OP8 Pro / OP8T |
 | `TORAIDL` | [toraidl/android_kernel_oneplus_sm8250](https://github.com/toraidl/android_kernel_oneplus_sm8250) | `op8t` | `vendor/oplus-stock_defconfig` | OP8T / OP9R |
+| `ONEPLUSOSS_OP8_OOS13_1` | [OnePlusOSS/android_kernel_oneplus_sm8250](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250) | `oneplus/sm8250_t_13.1_op8` | `vendor/kona-perf_defconfig` | OP8 on OOS 13.1 |
+| `ONEPLUSOSS_OP9R_OOS13_1` | [OnePlusOSS/android_kernel_oneplus_sm8250](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250) | `oneplus/sm8250_t_13.1_op9r` | `vendor/kona-perf_defconfig` | OP9R on OOS 13.1 |
+| `ONEPLUSOSS_OP8T_OOS14` | [OnePlusOSS/android_kernel_oneplus_sm8250](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250) | `oneplus/sm8250_u_14.0.0_op8t` | `vendor/kona-perf_defconfig` | OP8T on OOS 14 |
+| `ONEPLUSOSS_OP9R_OOS14` | [OnePlusOSS/android_kernel_oneplus_sm8250](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250) | `oneplus/sm8250_u_14.0.0_op9r` | `vendor/kona-perf_defconfig` | OP9R on OOS 14 |
 
 | Device | SoC | Notes |
 |--------|-----|--------|
@@ -49,7 +53,7 @@ Workflow input: select `source_preset`; leave `kernel_branch` empty to use its d
 
 ## Important warnings
 
-1. **Community source trees** — they are not official OnePlus release artifacts; verify boot and hardware behavior on your exact OOS build.
+1. **Source provenance** — the `ONEPLUSOSS_*` presets are official source branches; community presets still need exact-device boot and hardware verification.
 2. **Non-GKI 4.19** — no LKM install; every KernelSU/SUSFS integration change needs a full kernel rebuild.
 3. **SUSFS patches** may need reject fixes on OEM/community trees — first boots may need patch iteration.
 4. **Unlocked bootloader**; disable verification when required.

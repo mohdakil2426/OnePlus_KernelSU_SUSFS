@@ -41,6 +41,10 @@ on:
           - HELLBOY017
           - PPAJDA
           - TORAIDL
+          - ONEPLUSOSS_OP8_OOS13_1
+          - ONEPLUSOSS_OP9R_OOS13_1
+          - ONEPLUSOSS_OP8T_OOS14
+          - ONEPLUSOSS_OP9R_OOS14
       kernel_branch:
         description: 'Optional supported branch override (empty = source preset default)'
         required: false
@@ -142,7 +146,7 @@ jobs:
                 preset: $p,
                 kernel_source: $S.kernel_source,
                 kernel_branch: $kbranch,
-                defconfig: (if $dc_ovr != "" then $dc_ovr else $S.defconfig end),
+                defconfig: (if $dc_ovr != "" then $dc_ovr else $S.defconfig end)
               }]
             }
             ' "$SOURCES")

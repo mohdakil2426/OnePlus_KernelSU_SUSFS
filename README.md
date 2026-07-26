@@ -18,6 +18,10 @@ Build **STOCK**, **KernelSU-Next**, or **KernelSU-Next + SUSFS** kernels for the
 | `HELLBOY017` | [HELLBOY017/kernel_oneplus_sm8250](https://github.com/HELLBOY017/kernel_oneplus_sm8250) | `14` | `vendor/oplus-stock_defconfig` | OP8 series |
 | `PPAJDA` | [ppajda/android_kernel_oneplus_sm8250](https://github.com/ppajda/android_kernel_oneplus_sm8250) | `oos13.1` | `op8_defconfig` | OP8 / OP8 Pro / OP8T |
 | `TORAIDL` | [toraidl/android_kernel_oneplus_sm8250](https://github.com/toraidl/android_kernel_oneplus_sm8250) | `op8t` | `vendor/oplus-stock_defconfig` | OP8T / OP9R |
+| `ONEPLUSOSS_OP8_OOS13_1` | [OnePlusOSS/android_kernel_oneplus_sm8250](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250) | `oneplus/sm8250_t_13.1_op8` | `vendor/kona-perf_defconfig` | OP8 on OOS 13.1 |
+| `ONEPLUSOSS_OP9R_OOS13_1` | [OnePlusOSS/android_kernel_oneplus_sm8250](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250) | `oneplus/sm8250_t_13.1_op9r` | `vendor/kona-perf_defconfig` | OP9R on OOS 13.1 |
+| `ONEPLUSOSS_OP8T_OOS14` | [OnePlusOSS/android_kernel_oneplus_sm8250](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250) | `oneplus/sm8250_u_14.0.0_op8t` | `vendor/kona-perf_defconfig` | OP8T on OOS 14 |
+| `ONEPLUSOSS_OP9R_OOS14` | [OnePlusOSS/android_kernel_oneplus_sm8250](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250) | `oneplus/sm8250_u_14.0.0_op9r` | `vendor/kona-perf_defconfig` | OP9R on OOS 14 |
 
 `STOCK` builds are clean upstream builds: the builder does not patch source files or rewrite the selected defconfig. `KSUN` and `KSUN_SUSFS` only add the requested KernelSU-Next and SUSFS integrations.
 
@@ -73,7 +77,7 @@ gh workflow run "Build OP8 Series Kernel (SM8250)" \
 |-------|---------|
 | `build_mode` | `STOCK` / `KSUN` / `KSUN_SUSFS` |
 | `device_profile` | AnyKernel device check filter |
-| `source_preset` | `HELLBOY017` / `PPAJDA` / `TORAIDL` |
+| `source_preset` | `HELLBOY017` / `PPAJDA` / `TORAIDL` / exact-device `ONEPLUSOSS_*` OOS preset |
 | `kernel_branch` | Optional override; must be allowed by the selected source (empty = that preset's default) |
 | `defconfig_override` | Optional (empty = selected source's default defconfig) |
 | `ksun_ref` / `susfs_ref` | For root modes |
@@ -153,6 +157,7 @@ scripts/package-anykernel.sh
 - [HELLBOY017/kernel_oneplus_sm8250](https://github.com/HELLBOY017/kernel_oneplus_sm8250) (Meteoric / CLO)
 - [ppajda/android_kernel_oneplus_sm8250](https://github.com/ppajda/android_kernel_oneplus_sm8250)
 - [toraidl/android_kernel_oneplus_sm8250](https://github.com/toraidl/android_kernel_oneplus_sm8250)
+- [OnePlusOSS/android_kernel_oneplus_sm8250](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250)
 - [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next)
 - [simonpunk/susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu)
 - [sidex15/susfs4ksu-module](https://github.com/sidex15/susfs4ksu-module)
