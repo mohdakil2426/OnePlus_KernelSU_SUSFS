@@ -271,6 +271,25 @@ if begin == -1 or finish == -1 or "struct cs_target tgt" not in source[begin:fin
 source = source[:begin] + "\n#ifdef CONFIG_CPUSET_ASSIST" + source[begin:finish] + "\n#endif\n" + source[finish:]
 path.write_text(source)
 PY
+  python3 - "$KERNEL_DIR/kernel/sched/tune.c" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+source = path.read_text()
+callbacks = (
+    (".write_u64 = sched_boost_override_write_wrapper,", "sched_boost_override_write"),
+    (".write_u64 = sched_colocate_write_wrapper,", "sched_colocate_write"),
+    (".write_s64 = boost_write_wrapper,", "boost_write"),
+    (".write_u64 = prefer_idle_write_wrapper,", "prefer_idle_write"),
+)
+for guarded, base in callbacks:
+    if source.count(guarded) != 1:
+        raise SystemExit(f"error: expected {guarded} exactly once")
+    replacement = f"#ifdef CONFIG_STUNE_ASSIST\n\t\t{guarded}\n#else\n\t\t.write_{'s64' if 'write_s64' in guarded else 'u64'} = {base},\n#endif"
+    source = source.replace(guarded, replacement)
+path.write_text(source)
+PY
   endgroup
 fi
 
