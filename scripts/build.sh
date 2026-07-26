@@ -290,6 +290,21 @@ for guarded, base in callbacks:
     source = source.replace(guarded, replacement)
 path.write_text(source)
 PY
+  python3 - "$KERNEL_DIR/kernel/sysctl.c" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+source = path.read_text()
+needle = "static int two_hundred_fifty_five = 255;"
+first = source.find(needle)
+second = source.find(needle, first + len(needle))
+if first == -1 or second == -1 or source.find(needle, second + len(needle)) != -1:
+    raise SystemExit("error: expected two sysctl limit declarations")
+line_end = source.find("\n", second)
+source = source[:second] + source[line_end + 1:]
+path.write_text(source)
+PY
   endgroup
 fi
 
