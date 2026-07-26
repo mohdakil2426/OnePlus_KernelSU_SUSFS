@@ -63,6 +63,16 @@ official SUSFS 4.19 patch, so this builder owns a small, fail-fast compatibility
 bridge and an exact OnePlus 4.19 rebase. Patch fuzz and rejected hunks are not
 accepted.
 
+Clean GitHub Actions run
+[`30208343645`](https://github.com/mohdakil2426/OnePlus_KernelSU_SUSFS/actions/runs/30208343645)
+compiled both `fs/susfs.o` and the current KernelSU object set, linked
+`arch/arm64/boot/Image`, and validated the OP8 AnyKernel package. The downloaded
+`Image` SHA-256 is
+`74f83b13371cea1f611373f0703be14ecf1ac16efa52a769e44d81f164fc8132`;
+the ZIP SHA-256 is
+`a2f3202e79f0c7c1cc6e3351855d0fa2db7f280fb1e8f8cb1364b9dca2047d24`.
+This is compile/package proof, not physical boot proof.
+
 ---
 
 ## Important warnings

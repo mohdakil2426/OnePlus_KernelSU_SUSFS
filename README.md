@@ -52,6 +52,26 @@ This git branch is **not** for OP10+ GKI devices. Upstream multi-device WildKern
 - **ccache** via GitHub release bucket `ccache-cache` (same pattern as upstream author on `main`, adapted here)
 - Manual GitHub Actions control on this branch only
 
+### Verified OP8 root build
+
+[Clean run 30208343645](https://github.com/mohdakil2426/OnePlus_KernelSU_SUSFS/actions/runs/30208343645)
+passed on integration commit `0f9c05d90d7a42a7887c4fd5e5eb938a44faac7c`.
+It used the official OP8 OOS 13.1 kernel revision
+`9fdb3aa681ecbafa77e160bd93d0740537c6457c`, matching companion revision
+`dab8a261393373f8be4e85209eafcdf0d5f461cb`, Android Clang 11.0.5
+`r399163b`, and the pinned root/package revisions above.
+
+| Output | SHA-256 |
+|--------|---------|
+| `Image` | `74f83b13371cea1f611373f0703be14ecf1ac16efa52a769e44d81f164fc8132` |
+| AnyKernel ZIP | `a2f3202e79f0c7c1cc6e3351855d0fa2db7f280fb1e8f8cb1364b9dca2047d24` |
+| GitHub artifact container | `390eeb881e5450d1b98b87e32c8eb30883d927f48e98a4bbbd24cb1e76f8e300` |
+
+The downloaded ZIP was revalidated after the run: it contains the non-empty
+`Image`, AnyKernel core, `instantnoodle` device check, active-slot boot
+resolution, and no sample/GKI-only abort rule. Physical-device boot remains
+unverified.
+
 ---
 
 ## Build (GitHub Actions)
