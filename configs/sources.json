@@ -4,6 +4,7 @@
     "kernel_source": "https://github.com/HELLBOY017/kernel_oneplus_sm8250.git",
     "kernel_branch": "14",
     "allowed_branches": ["14", "13.1", "13.1-new"],
+    "supported_devices": ["OP8", "OP8Pro", "OP8T", "OP9R"],
     "defconfig": "vendor/oplus-stock_defconfig",
     "notes": "Default 14 (A14-class). 13.1 / 13.1-new = A13.1-class tips. Match to your OOS generation."
   },
@@ -12,6 +13,7 @@
     "kernel_source": "https://github.com/ppajda/android_kernel_oneplus_sm8250.git",
     "kernel_branch": "oos13.1",
     "allowed_branches": ["oos13.1"],
+    "supported_devices": ["OP8", "OP8Pro", "OP8T"],
     "defconfig": "op8_defconfig",
     "notes": "Stock-source baseline for OnePlus 8 / 8 Pro / 8T. No builder source workarounds are applied."
   },
@@ -20,6 +22,7 @@
     "kernel_source": "https://github.com/toraidl/android_kernel_oneplus_sm8250.git",
     "kernel_branch": "op8t",
     "allowed_branches": ["op8t"],
+    "supported_devices": ["OP8T", "OP9R"],
     "defconfig": "vendor/oplus-stock_defconfig",
     "notes": "Stock-source baseline for OnePlus 8T / 9R. No builder source workarounds are applied."
   },
@@ -32,6 +35,7 @@
     "toolchain": "android-clang-r399163b",
     "source_patch_set": "oneplusoss-sm8250-strict-prototypes",
     "allowed_branches": ["oneplus/sm8250_t_13.1_op8"],
+    "supported_devices": ["OP8"],
     "defconfig": "vendor/kona-perf_defconfig",
     "notes": "Official OOS 13.1 source sync for OnePlus 8. Use only with the matching OP8 OOS 13.1 base."
   },
@@ -44,6 +48,7 @@
     "toolchain": "android-clang-r399163b",
     "source_patch_set": "oneplusoss-sm8250-strict-prototypes",
     "allowed_branches": ["oneplus/sm8250_t_13.1_op9r"],
+    "supported_devices": ["OP9R"],
     "defconfig": "vendor/kona-perf_defconfig",
     "notes": "Official OOS 13.1 source sync for OnePlus 9R. Use only with the matching OP9R OOS 13.1 base."
   },
@@ -56,6 +61,7 @@
     "toolchain": "android-clang-r399163b",
     "source_patch_set": "oneplusoss-sm8250-strict-prototypes",
     "allowed_branches": ["oneplus/sm8250_u_14.0.0_op8t"],
+    "supported_devices": ["OP8T"],
     "defconfig": "vendor/kona-perf_defconfig",
     "notes": "Official OOS 14 source sync for OnePlus 8T. Use only with the matching OP8T OOS 14 base."
   },
@@ -68,6 +74,7 @@
     "toolchain": "android-clang-r399163b",
     "source_patch_set": "oneplusoss-sm8250-strict-prototypes",
     "allowed_branches": ["oneplus/sm8250_u_14.0.0_op9r"],
+    "supported_devices": ["OP9R"],
     "defconfig": "vendor/kona-perf_defconfig",
     "notes": "Official OOS 14 source sync for OnePlus 9R. Use only with the matching OP9R OOS 14 base."
   }

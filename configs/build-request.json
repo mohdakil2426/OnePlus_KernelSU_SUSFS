@@ -4,7 +4,6 @@
   "build_mode": "KSUN_SUSFS",
   "device_profile": "OP8",
   "kernel_branch": "oneplus/sm8250_t_13.1_op8",
-  "defconfig_override": "",
   "ksun_ref": "53791c92bff13d62338f29cc9da035a37652ca91",
   "susfs_ref": "001e69919c6271f690fd00b17e4c721c9e599152",
   "clean_build": true,

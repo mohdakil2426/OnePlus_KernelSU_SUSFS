@@ -91,7 +91,10 @@ do
   grep -Fxq "$expected" out/.config ||
     { echo "error: missing $expected" >&2; exit 1; }
 done
-! grep -Fxq 'CONFIG_KSU_KPROBES_HOOK=y' out/.config
+if grep -Fxq 'CONFIG_KSU_KPROBES_HOOK=y' out/.config; then
+  echo "error: KernelSU kprobe hook mode must stay disabled" >&2
+  exit 1
+fi
 
 if [[ "$COMPILE" == "true" ]]; then
   make -j"$JOBS" "${MAKE_ARGS[@]}" Image

@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       build_mode:
-        description: 'STOCK = no root | KSUN | KSUN_SUSFS'
+        description: 'Root: STOCK / KernelSU-Next / optional SUSFS'
         required: true
         type: choice
         default: 'KSUN_SUSFS'
@@ -22,60 +22,37 @@ on:
           - KSUN
           - KSUN_SUSFS
       device_profile:
-        description: 'AnyKernel device codenames'
+        description: 'Device: verified OnePlus 8 only'
         required: true
         type: choice
         default: 'OP8'
         options:
-          - ALL_OP8_SERIES
           - OP8
-          - OP8Pro
-          - OP8T
-          - OP9R
       source_preset:
-        description: 'Kernel source preset'
+        description: 'Source: OP8-compatible kernel preset'
         required: true
         type: choice
         default: 'ONEPLUSOSS_OP8_OOS13_1'
         options:
           - HELLBOY017
           - PPAJDA
-          - TORAIDL
           - ONEPLUSOSS_OP8_OOS13_1
-          - ONEPLUSOSS_OP9R_OOS13_1
-          - ONEPLUSOSS_OP8T_OOS14
-          - ONEPLUSOSS_OP9R_OOS14
       kernel_branch:
-        description: 'Optional supported branch override (empty = source preset default)'
+        description: 'Source: supported branch override (empty = preset default)'
         required: false
         type: string
         default: ''
-      defconfig_override:
-        description: 'Optional defconfig override (empty = vendor/oplus-stock_defconfig)'
-        required: false
-        type: string
-        default: ''
-      ksun_ref:
-        description: 'KernelSU-Next ref (KSUN modes)'
-        required: false
-        type: string
-        default: '53791c92bff13d62338f29cc9da035a37652ca91'
-      susfs_ref:
-        description: 'SUSFS ref (KSUN_SUSFS)'
-        required: false
-        type: string
-        default: '001e69919c6271f690fd00b17e4c721c9e599152'
       clean_build:
-        description: 'Clean build (no ccache)'
+        description: 'CI: clean build without ccache'
         type: boolean
         default: true
       make_release:
-        description: 'Create GitHub Release'
+        description: 'Release: create draft after success'
         required: true
         type: boolean
         default: false
       debug:
-        description: 'Enable debug mode / upload logs on failure'
+        description: 'CI: upload build log on failure'
         required: false
         type: boolean
         default: true
@@ -94,7 +71,10 @@ jobs:
       make_release: ${{ steps.r.outputs.make_release }}
       debug: ${{ steps.r.outputs.debug }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Validate builder
+        run: bash tests/run-static-tests.sh
 
       - name: Build job matrix
         id: r
@@ -102,6 +82,7 @@ jobs:
         run: |
           set -euo pipefail
           SOURCES=configs/sources.json
+          REQUEST=configs/build-request.json
 
           PRESET="${{ inputs.source_preset }}"
           if ! jq -e --arg p "$PRESET" 'has($p)' "$SOURCES" >/dev/null; then
@@ -111,13 +92,25 @@ jobs:
 
           MODE="${{ inputs.build_mode }}"
           DEV="${{ inputs.device_profile }}"
-          KSUN="${{ inputs.ksun_ref || '53791c92bff13d62338f29cc9da035a37652ca91' }}"
-          SUSFS="${{ inputs.susfs_ref || '001e69919c6271f690fd00b17e4c721c9e599152' }}"
+          KSUN=$(jq -er '.ksun_ref' "$REQUEST")
+          SUSFS=$(jq -er '.susfs_ref' "$REQUEST")
+          [[ "$KSUN" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Configured KernelSU-Next revision is not immutable"
+            exit 1
+          }
+          [[ "$SUSFS" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Configured SUSFS revision is not immutable"
+            exit 1
+          }
           CLEAN="${{ inputs.clean_build }}"
           REL="${{ inputs.make_release }}"
           DBG="${{ inputs.debug }}"
           KBRANCH="${{ inputs.kernel_branch }}"
-          DC_OVR="${{ inputs.defconfig_override }}"
+          if ! jq -e --arg p "$PRESET" --arg d "$DEV" \
+            '.[$p].supported_devices | index($d)' "$SOURCES" >/dev/null; then
+            echo "::error::source_preset=$PRESET does not support device_profile=$DEV"
+            exit 1
+          fi
           if [[ -z "$KBRANCH" ]]; then
             KBRANCH=$(jq -er --arg p "$PRESET" '.[$p].kernel_branch' "$SOURCES")
           fi
@@ -126,19 +119,20 @@ jobs:
             exit 1
           fi
 
-          echo "build_mode=$MODE" >> "$GITHUB_OUTPUT"
-          echo "device_profile=$DEV" >> "$GITHUB_OUTPUT"
-          echo "ksun_ref=$KSUN" >> "$GITHUB_OUTPUT"
-          echo "susfs_ref=$SUSFS" >> "$GITHUB_OUTPUT"
-          echo "clean_build=$CLEAN" >> "$GITHUB_OUTPUT"
-          echo "make_release=$REL" >> "$GITHUB_OUTPUT"
-          echo "debug=$DBG" >> "$GITHUB_OUTPUT"
+          {
+            echo "build_mode=$MODE"
+            echo "device_profile=$DEV"
+            echo "ksun_ref=$KSUN"
+            echo "susfs_ref=$SUSFS"
+            echo "clean_build=$CLEAN"
+            echo "make_release=$REL"
+            echo "debug=$DBG"
+          } >> "$GITHUB_OUTPUT"
 
           # Manual dispatch always resolves to one selected source and branch.
           MATRIX=$(jq -c \
             --arg p "$PRESET" \
             --arg kbranch "$KBRANCH" \
-            --arg dc_ovr "${DC_OVR:-}" \
             '
             .[$p] as $S |
             {
@@ -150,7 +144,7 @@ jobs:
                 companion_branch: ($S.companion_branch // ""),
                 toolchain: ($S.toolchain // "zyc-clang-14"),
                 source_patch_set: ($S.source_patch_set // "none"),
-                defconfig: (if $dc_ovr != "" then $dc_ovr else $S.defconfig end)
+                defconfig: $S.defconfig
               }]
             }
             ' "$SOURCES")
@@ -165,6 +159,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download custom ccache once
+        if: ${{ inputs.clean_build != true }}
         run: |
           set -uo pipefail
           echo "::group::Download ccache"
@@ -186,7 +181,8 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload ccache artifact
-        uses: actions/upload-artifact@v4
+        if: ${{ inputs.clean_build != true }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ccache-binary
           path: ccache
@@ -203,7 +199,7 @@ jobs:
       matrix: ${{ fromJSON(needs.resolve.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Disk cleanup
         uses: ./.github/actions/disk-cleanup
@@ -218,13 +214,15 @@ jobs:
             libncurses-dev jq ccache aria2 zstd
 
       - name: Get prebuilt ccache (downloaded once by prepare_ccache)
-        uses: actions/download-artifact@v4
+        if: ${{ needs.resolve.outputs.clean_build != 'true' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ccache-binary
           path: ccache-dl
         continue-on-error: true
 
       - name: Install ccache (ECS by cctv18, shared via artifact)
+        if: ${{ needs.resolve.outputs.clean_build != 'true' }}
         run: |
           set -uo pipefail
           echo "::group::Install ccache"
@@ -278,9 +276,11 @@ jobs:
             exit 1
           }
           CLANG_VER=$(grep -oE 'clang version [0-9]+\.[0-9]+\.[0-9]+' <<< "$CLANG_OUTPUT" | head -1 | awk '{print $3}')
-          echo "TOOLCHAIN_PROFILE=$TOOLCHAIN" >> "$GITHUB_ENV"
-          echo "CLANG_VERSION_SHORT=${CLANG_VER%%.*}" >> "$GITHUB_ENV"
-          echo "CLANG_VERSION=$CLANG_VER" >> "$GITHUB_ENV"
+          {
+            echo "TOOLCHAIN_PROFILE=$TOOLCHAIN"
+            echo "CLANG_VERSION_SHORT=${CLANG_VER%%.*}"
+            echo "CLANG_VERSION=$CLANG_VER"
+          } >> "$GITHUB_ENV"
 
       - name: Setup selected GNU cross tools
         run: |
@@ -306,6 +306,7 @@ jobs:
           fi
 
       - name: ♻️ Configure ccache (bounded)
+        if: ${{ needs.resolve.outputs.clean_build != 'true' }}
         run: |
           echo "::group::Configure ccache environment"
           set -euo pipefail
@@ -333,7 +334,7 @@ jobs:
             )
 
             for setting in "${SETTINGS[@]}"; do
-              export "$setting"
+              export "${setting?}"
               echo "$setting" >> "$GITHUB_ENV"
             done
 
@@ -351,6 +352,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Set ccache key
+        if: ${{ needs.resolve.outputs.clean_build != 'true' }}
         run: |
           set -euo pipefail
           # Author-style key: MODE-v1-PRESET-BRANCH-clangN (slashes → _)
@@ -426,6 +428,10 @@ jobs:
           WORK_DIR: ${{ github.workspace }}/work
         run: bash scripts/build.sh
 
+      - name: Publish build summary
+        if: success()
+        run: cat artifacts/build-summary.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: 📊 ccache Post-Build Statistics
         id: ccache_stats
         if: ${{ success() && needs.resolve.outputs.clean_build != 'true' }}
@@ -468,11 +474,13 @@ jobs:
 
           echo "::endgroup::"
 
-          echo "## 📊 ccache Statistics" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          ccache -s --verbose >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || ccache -s >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## 📊 ccache Statistics"
+            echo
+            echo '```'
+            ccache -s --verbose 2>/dev/null || ccache -s
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Save ccache cache
         if: ${{ success() && needs.resolve.outputs.clean_build != 'true' }}
@@ -487,19 +495,21 @@ jobs:
 
       - name: Upload artifacts
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ${{ matrix.preset }}-${{ needs.resolve.outputs.build_mode }}-${{ steps.build.outputs.zip_name || 'kernel' }}
+          name: ${{ steps.build.outputs.artifact_name }}
           path: |
             artifacts/*.zip
+            artifacts/*.zip.sha256
             artifacts/Image
             artifacts/build-info.txt
+            artifacts/build-summary.md
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload failure logs
         if: failure() && needs.resolve.outputs.debug == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: fail-${{ matrix.preset }}-${{ github.run_id }}
           path: |
@@ -510,23 +520,16 @@ jobs:
 
       - name: Create release
         if: success() && needs.resolve.outputs.make_release == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: op8series-${{ matrix.preset }}-${{ github.run_number }}
           name: OP8 ${{ needs.resolve.outputs.build_mode }} · ${{ matrix.preset }} · ${{ matrix.kernel_branch }}
-          body: |
-            | Field | Value |
-            |-------|--------|
-            | Preset | `${{ matrix.preset }}` |
-            | Source | `${{ matrix.kernel_source }}` |
-            | Branch | `${{ matrix.kernel_branch }}` |
-            | Mode | `${{ needs.resolve.outputs.build_mode }}` |
-            | Defconfig | `${{ matrix.defconfig }}` |
-            | Kernel | `${{ steps.build.outputs.kernel_version }}` |
-            | Clean Build | `${{ needs.resolve.outputs.clean_build }}` |
-            | ccache Hit | `${{ steps.ccache_stats.outputs.hit_rate || 'n/a' }}` |
+          draft: true
+          body_path: artifacts/build-summary.md
           files: |
             artifacts/*.zip
+            artifacts/*.zip.sha256
             artifacts/build-info.txt
+            artifacts/build-summary.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

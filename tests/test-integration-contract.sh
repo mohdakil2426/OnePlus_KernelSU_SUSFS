@@ -48,10 +48,11 @@ excludes assets/anykernel-op8.sh "tuna" "installer has no sample Tuna target"
 excludes assets/anykernel-op8.sh "/dev/block/platform/omap" "installer has no sample OMAP path"
 executable_file scripts/verify-anykernel.sh "AnyKernel validator is executable"
 
-contains .github/workflows/build-kernel.yml "$KSUN_SHA" "workflow pins KernelSU"
-contains .github/workflows/build-kernel.yml "$SUSFS_SHA" "workflow pins SUSFS"
+contains .github/workflows/build-kernel.yml "jq -er '.ksun_ref'" "workflow reads the configured KernelSU pin"
+contains .github/workflows/build-kernel.yml "jq -er '.susfs_ref'" "workflow reads the configured SUSFS pin"
 contains configs/build-request.json "$KSUN_SHA" "request config pins KernelSU"
 contains configs/build-request.json "$SUSFS_SHA" "request config pins SUSFS"
+excludes scripts/apply-ksun.sh "pershoot/KernelSU-Next" "OnePlus uses official KernelSU-Next, not the Marble fork"
 
 if (( failures > 0 )); then
   printf '\n%d contract test(s) failed\n' "$failures" >&2
