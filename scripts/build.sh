@@ -252,6 +252,15 @@ make "${MAKE_ARGS[@]}" olddefconfig
 grep -E 'CONFIG_LOCKING_PROTECT|CONFIG_KSU|CONFIG_OPLUS' out/.config | head -40 || true
 endgroup
 
+# HELLBOY 13.1-class cpuset.c declares cs_target only when CPUSET_ASSIST is
+# enabled, but uses it in an unconditional helper. Guard that helper as well.
+if [[ "$KERNEL_BRANCH" == "13.1" || "$KERNEL_BRANCH" == "13.1-new" ]]; then
+  log "Guard disabled CPUSET_ASSIST helper (13.1-class trees)"
+  git -C "$KERNEL_DIR" apply --check "$SCRIPT_DIR/patches/cpuset-assist-guard.patch"
+  git -C "$KERNEL_DIR" apply "$SCRIPT_DIR/patches/cpuset-assist-guard.patch"
+  endgroup
+fi
+
 log "Compile Image (jobs=$JOBS)"
 # Explicit Image target (skip unavailable vendor modules). Capture exit of make, not tee.
 set +e
