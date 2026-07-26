@@ -305,6 +305,20 @@ line_end = source.find("\n", second)
 source = source[:second] + source[line_end + 1:]
 path.write_text(source)
 PY
+  python3 - "$KERNEL_DIR/drivers/gpu/drm/drm_atomic.c" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+source = path.read_text()
+start = "\n\t/* Boost CPU and DDR when committing a new frame */"
+end = "\n\tdrm_modeset_acquire_init(&ctx, DRM_MODESET_ACQUIRE_INTERRUPTIBLE);"
+begin = source.find(start)
+finish = source.find(end, begin)
+if begin == -1 or finish == -1 or source.count("last_input_time") != 1:
+    raise SystemExit("error: expected orphaned DRM input boost block")
+path.write_text(source[:begin] + source[finish:])
+PY
   endgroup
 fi
 
