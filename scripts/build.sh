@@ -256,8 +256,21 @@ endgroup
 # enabled, but uses it in an unconditional helper. Guard that helper as well.
 if [[ "$KERNEL_BRANCH" == "13.1" || "$KERNEL_BRANCH" == "13.1-new" ]]; then
   log "Guard disabled CPUSET_ASSIST helper (13.1-class trees)"
-  git -C "$KERNEL_DIR" apply --check "$SCRIPT_DIR/patches/cpuset-assist-guard.patch"
-  git -C "$KERNEL_DIR" apply "$SCRIPT_DIR/patches/cpuset-assist-guard.patch"
+  python3 - "$KERNEL_DIR/kernel/cgroup/cpuset.c" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+source = path.read_text()
+start = "\nstatic ssize_t cpuset_write_resmask_assist("
+end = "\nstatic ssize_t cpuset_write_resmask_wrapper("
+begin = source.find(start)
+finish = source.find(end, begin)
+if begin == -1 or finish == -1 or "struct cs_target tgt" not in source[begin:finish]:
+    raise SystemExit("error: expected cpuset assist helper was not found")
+source = source[:begin] + "\n#ifdef CONFIG_CPUSET_ASSIST" + source[begin:finish] + "\n#endif\n" + source[finish:]
+path.write_text(source)
+PY
   endgroup
 fi
 
