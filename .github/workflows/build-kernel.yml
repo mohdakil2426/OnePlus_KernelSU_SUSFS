@@ -148,6 +148,7 @@ jobs:
                 kernel_branch: $kbranch,
                 companion_source: ($S.companion_source // ""),
                 companion_branch: ($S.companion_branch // ""),
+                toolchain: ($S.toolchain // "zyc-clang-14"),
                 defconfig: (if $dc_ovr != "" then $dc_ovr else $S.defconfig end)
               }]
             }
@@ -237,38 +238,71 @@ jobs:
           echo "[DEBUG] Ccache version : $(ccache --version | head -1)"
           echo "::endgroup::"
 
-      - name: Setup Clang (ZyC 14)
+      - name: Setup selected Clang
         run: |
           set -euo pipefail
+          TOOLCHAIN="${{ matrix.toolchain }}"
+          case "$TOOLCHAIN" in
+            android-clang-r399163b)
+              CLANG_URL="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-12.1.0_r0.25/clang-r399163b.tar.gz"
+              EXPECTED_VERSION="11.0.5"
+              ;;
+            zyc-clang-14)
+              CLANG_URL="https://github.com/ZyCromerZ/Clang/releases/download/14.0.6-20250704-release/Clang-14.0.6-20250704.tar.gz"
+              EXPECTED_VERSION="14.0.6"
+              ;;
+            *)
+              echo "::error::Unknown toolchain profile: $TOOLCHAIN"
+              exit 1
+              ;;
+          esac
+
           mkdir -p toolchains/clang
-          curl -fsSL \
-            "https://github.com/ZyCromerZ/Clang/releases/download/14.0.6-20250704-release/Clang-14.0.6-20250704.tar.gz" \
+          curl -fL --retry 3 --connect-timeout 30 --max-time 900 "$CLANG_URL" \
             | tar -xzf - -C toolchains/clang
           if [ -x toolchains/clang/bin/clang ]; then
-            echo "$GITHUB_WORKSPACE/toolchains/clang/bin" >> "$GITHUB_PATH"
+            CLANG_BIN_DIR="$GITHUB_WORKSPACE/toolchains/clang/bin"
           else
-            nested=$(find toolchains/clang -maxdepth 3 -type f -name clang | head -1 || true)
-            if [ -n "$nested" ]; then
-              echo "$(dirname "$(dirname "$nested")")/bin" >> "$GITHUB_PATH"
-            fi
+            nested=$(find toolchains/clang -maxdepth 3 -type f -name clang -print -quit)
+            [ -n "$nested" ] || { echo "::error::clang binary not found"; exit 1; }
+            CLANG_BIN_DIR="$(dirname "$nested")"
           fi
-          clang --version || true
-          # Short clang version for ccache key (author pattern: CLANG_VERSION_SHORT)
-          CLANG_VER=$(clang --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "14")
+
+          export PATH="$CLANG_BIN_DIR:$PATH"
+          echo "$CLANG_BIN_DIR" >> "$GITHUB_PATH"
+          CLANG_OUTPUT=$(clang --version)
+          echo "$CLANG_OUTPUT"
+          grep -Fq "clang version $EXPECTED_VERSION" <<< "$CLANG_OUTPUT" || {
+            echo "::error::Expected Clang $EXPECTED_VERSION for $TOOLCHAIN"
+            exit 1
+          }
+          CLANG_VER=$(grep -oE 'clang version [0-9]+\.[0-9]+\.[0-9]+' <<< "$CLANG_OUTPUT" | head -1 | awk '{print $3}')
+          echo "TOOLCHAIN_PROFILE=$TOOLCHAIN" >> "$GITHUB_ENV"
           echo "CLANG_VERSION_SHORT=${CLANG_VER%%.*}" >> "$GITHUB_ENV"
           echo "CLANG_VERSION=$CLANG_VER" >> "$GITHUB_ENV"
 
-      - name: Setup AOSP GCC
+      - name: Setup selected GNU cross tools
         run: |
           set -euo pipefail
-          git clone --depth=1 -b android12L-release \
-            https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 \
-            toolchains/gcc64
-          git clone --depth=1 -b android12L-release \
-            https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 \
-            toolchains/gcc32
-          echo "$GITHUB_WORKSPACE/toolchains/gcc64/bin" >> "$GITHUB_PATH"
-          echo "$GITHUB_WORKSPACE/toolchains/gcc32/bin" >> "$GITHUB_PATH"
+          if [[ "${{ matrix.toolchain }}" == "android-clang-r399163b" ]]; then
+            mkdir -p toolchains/gas
+            curl -fL --retry 3 --connect-timeout 30 --max-time 300 \
+              "https://android.googlesource.com/platform/prebuilts/gas/linux-x86/+archive/592150fc8ae9f48f2e73f390961f32ca6f5f6a9f.tar.gz" \
+              | tar -xzf - -C toolchains/gas
+            chmod +x toolchains/gas/aarch64-linux-gnu-* toolchains/gas/arm-linux-gnueabi-*
+            echo "$GITHUB_WORKSPACE/toolchains/gas" >> "$GITHUB_PATH"
+            test -x toolchains/gas/aarch64-linux-gnu-as
+            test -x toolchains/gas/arm-linux-gnueabi-as
+          else
+            git clone --depth=1 -b android12L-release \
+              https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 \
+              toolchains/gcc64
+            git clone --depth=1 -b android12L-release \
+              https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 \
+              toolchains/gcc32
+            echo "$GITHUB_WORKSPACE/toolchains/gcc64/bin" >> "$GITHUB_PATH"
+            echo "$GITHUB_WORKSPACE/toolchains/gcc32/bin" >> "$GITHUB_PATH"
+          fi
 
       - name: ♻️ Configure ccache (bounded)
         run: |
@@ -378,6 +412,7 @@ jobs:
           KERNEL_BRANCH: ${{ matrix.kernel_branch }}
           COMPANION_SOURCE: ${{ matrix.companion_source }}
           COMPANION_BRANCH: ${{ matrix.companion_branch }}
+          TOOLCHAIN_PROFILE: ${{ matrix.toolchain }}
           BUILD_MODE: ${{ needs.resolve.outputs.build_mode }}
           DEFCONFIG: ${{ matrix.defconfig }}
           DEVICE_PROFILE: ${{ needs.resolve.outputs.device_profile }}

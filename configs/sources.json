@@ -29,6 +29,7 @@
     "kernel_branch": "oneplus/sm8250_t_13.1_op8",
     "companion_source": "https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8250.git",
     "companion_branch": "oneplus/sm8250_t_13.1_op8",
+    "toolchain": "android-clang-r399163b",
     "allowed_branches": ["oneplus/sm8250_t_13.1_op8"],
     "defconfig": "vendor/kona-perf_defconfig",
     "notes": "Official OOS 13.1 source sync for OnePlus 8. Use only with the matching OP8 OOS 13.1 base."
@@ -39,6 +40,7 @@
     "kernel_branch": "oneplus/sm8250_t_13.1_op9r",
     "companion_source": "https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8250.git",
     "companion_branch": "oneplus/sm8250_t_13.1_op9r",
+    "toolchain": "android-clang-r399163b",
     "allowed_branches": ["oneplus/sm8250_t_13.1_op9r"],
     "defconfig": "vendor/kona-perf_defconfig",
     "notes": "Official OOS 13.1 source sync for OnePlus 9R. Use only with the matching OP9R OOS 13.1 base."
@@ -49,6 +51,7 @@
     "kernel_branch": "oneplus/sm8250_u_14.0.0_op8t",
     "companion_source": "https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8250.git",
     "companion_branch": "oneplus/sm8250_u_14.0.0_op8t",
+    "toolchain": "android-clang-r399163b",
     "allowed_branches": ["oneplus/sm8250_u_14.0.0_op8t"],
     "defconfig": "vendor/kona-perf_defconfig",
     "notes": "Official OOS 14 source sync for OnePlus 8T. Use only with the matching OP8T OOS 14 base."
@@ -59,6 +62,7 @@
     "kernel_branch": "oneplus/sm8250_u_14.0.0_op9r",
     "companion_source": "https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8250.git",
     "companion_branch": "oneplus/sm8250_u_14.0.0_op9r",
+    "toolchain": "android-clang-r399163b",
     "allowed_branches": ["oneplus/sm8250_u_14.0.0_op9r"],
     "defconfig": "vendor/kona-perf_defconfig",
     "notes": "Official OOS 14 source sync for OnePlus 9R. Use only with the matching OP9R OOS 14 base."

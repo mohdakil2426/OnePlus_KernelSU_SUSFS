@@ -8,6 +8,7 @@
 # Optional:
 #   KERNEL_SOURCE   git URL (default HELLBOY017)
 #   COMPANION_SOURCE / COMPANION_BRANCH for split official source releases
+#   TOOLCHAIN_PROFILE selected source toolchain (default zyc-clang-14)
 #   DEFCONFIG       default vendor/oplus-stock_defconfig
 #   DEVICE_PROFILE  ALL_OP8_SERIES | OP8 | OP8Pro | OP8T | OP9R
 #   SOURCE_PRESET   label for artifacts
@@ -23,6 +24,7 @@ KERNEL_SOURCE="${KERNEL_SOURCE:-https://github.com/HELLBOY017/kernel_oneplus_sm8
 KERNEL_BRANCH="${KERNEL_BRANCH:?KERNEL_BRANCH is required}"
 COMPANION_SOURCE="${COMPANION_SOURCE:-}"
 COMPANION_BRANCH="${COMPANION_BRANCH:-}"
+TOOLCHAIN_PROFILE="${TOOLCHAIN_PROFILE:-zyc-clang-14}"
 BUILD_MODE="${BUILD_MODE:?BUILD_MODE is required}"
 DEFCONFIG="${DEFCONFIG:-vendor/oplus-stock_defconfig}"
 DEVICE_PROFILE="${DEVICE_PROFILE:-ALL_OP8_SERIES}"
@@ -124,19 +126,31 @@ if command -v clang >/dev/null 2>&1; then
     CC_CMD=clang
     echo "ccache not found; building without cache"
   fi
-  MAKE_ARGS+=(
-    CC="$CC_CMD"
-    CLANG_TRIPLE=aarch64-linux-gnu-
-    CROSS_COMPILE=aarch64-linux-android-
-    CROSS_COMPILE_ARM32=arm-linux-androideabi-
-    LLVM_IAS=1
-    LD=ld.lld
-    AR=llvm-ar
-    NM=llvm-nm
-    OBJCOPY=llvm-objcopy
-    OBJDUMP=llvm-objdump
-    STRIP=llvm-strip
-  )
+  if [[ "$TOOLCHAIN_PROFILE" == "android-clang-r399163b" ]]; then
+    # Match the OnePlus build.config files: LLVM=1 with GNU cross assembler
+    # prefixes. Leaving LLVM_IAS unset makes this 4.19 tree use external gas.
+    MAKE_ARGS+=(
+      LLVM=1
+      CC="$CC_CMD"
+      CROSS_COMPILE=aarch64-linux-gnu-
+      CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+      CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+    )
+  else
+    MAKE_ARGS+=(
+      CC="$CC_CMD"
+      CLANG_TRIPLE=aarch64-linux-gnu-
+      CROSS_COMPILE=aarch64-linux-android-
+      CROSS_COMPILE_ARM32=arm-linux-androideabi-
+      LLVM_IAS=1
+      LD=ld.lld
+      AR=llvm-ar
+      NM=llvm-nm
+      OBJCOPY=llvm-objcopy
+      OBJDUMP=llvm-objdump
+      STRIP=llvm-strip
+    )
+  fi
 else
   MAKE_ARGS+=(CROSS_COMPILE=aarch64-linux-gnu-)
 fi
@@ -220,6 +234,7 @@ endgroup
   echo "kernel_branch=$KERNEL_BRANCH"
   echo "companion_source=$COMPANION_SOURCE"
   echo "companion_branch=$COMPANION_BRANCH"
+  echo "toolchain_profile=$TOOLCHAIN_PROFILE"
   echo "build_mode=$BUILD_MODE"
   echo "defconfig=$DEFCONFIG"
   echo "device_profile=$DEVICE_PROFILE"

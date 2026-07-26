@@ -27,6 +27,8 @@ Build **STOCK**, **KernelSU-Next**, or **KernelSU-Next + SUSFS** kernels for the
 
 The official `ONEPLUSOSS_*` presets compose both matching OnePlus repositories: the kernel tree and `android_kernel_modules_and_devicetree_oneplus_sm8250`. The latter supplies the `vendor/` and `techpack/` targets referenced by the kernel tree's symlinks; this is source assembly, not a kernel patch.
 
+Those presets also follow the published OnePlus build configuration: Android Clang `r399163b` (11.0.5), `LLVM=1`, and the matching `aarch64-linux-gnu` / `arm-linux-gnueabi` GNU assembler tools. Community presets retain their existing ZyC Clang profile.
+
 Match the selected source and branch to your installed stock OOS generation. Not every branch boots every ROM.
 
 This git branch is **not** for OP10+ GKI devices. Upstream multi-device WildKernels GKI pipeline lives on **`main`** (reference only; do not develop OP8 features there).

@@ -27,6 +27,8 @@ This builder lets you select one clean upstream source per manual workflow run:
 
 Official presets use the same-named branch from both [the kernel repository](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250) and [the companion modules/device-tree repository](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8250). A kernel-only clone is incomplete because its relative symlinks expect the companion `vendor/` and `kernel/msm-4.19/techpack/` trees in the shared source workspace.
 
+The official branches declare Android Clang `r399163b` (11.0.5), `LLVM=1`, and GNU cross-assembler prefixes `aarch64-linux-gnu-` / `arm-linux-gnueabi-`. The workflow selects this profile only for `ONEPLUSOSS_*`; community presets keep ZyC Clang 14.
+
 ---
 
 ## Branch guide (HELLBOY)
