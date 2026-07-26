@@ -11,18 +11,17 @@ Build **STOCK**, **KernelSU-Next**, or **KernelSU-Next + SUSFS** kernels for the
 | OnePlus 8T | SM8250 | `kebab` |
 | OnePlus 9R | SM8250-AC (SD870) | `lemonades` |
 
-### Kernel source (only)
+### Selectable kernel sources
 
-| Field | Value |
-|-------|--------|
-| **Repo** | [HELLBOY017/kernel_oneplus_sm8250](https://github.com/HELLBOY017/kernel_oneplus_sm8250) |
-| **Default HELLBOY branch** | `14` (Android 14–class) |
-| **Also selectable** | `13.1`, `13.1-new` (Android 13.1–class) |
-| **Default defconfig** | `vendor/oplus-stock_defconfig` |
+| Preset | Upstream | Default branch | Default defconfig | Intended devices |
+|--------|----------|----------------|-------------------|------------------|
+| `HELLBOY017` | [HELLBOY017/kernel_oneplus_sm8250](https://github.com/HELLBOY017/kernel_oneplus_sm8250) | `14` | `vendor/oplus-stock_defconfig` | OP8 series |
+| `PPAJDA` | [ppajda/android_kernel_oneplus_sm8250](https://github.com/ppajda/android_kernel_oneplus_sm8250) | `oos13.1` | `op8_defconfig` | OP8 / OP8 Pro / OP8T |
+| `TORAIDL` | [toraidl/android_kernel_oneplus_sm8250](https://github.com/toraidl/android_kernel_oneplus_sm8250) | `op8t` | `vendor/oplus-stock_defconfig` | OP8T / OP9R |
 
-No LineageOS / OnePlusOSS / other trees — this git branch is **HELLBOY-only**.
+`STOCK` builds are clean upstream builds: the builder does not patch source files or rewrite the selected defconfig. `KSUN` and `KSUN_SUSFS` only add the requested KernelSU-Next and SUSFS integrations.
 
-Match **HELLBOY branch ≈ your stock OOS generation** (`14` for OOS14-class, `13.1` for OOS13.1-class). Not every branch boots every ROM.
+Match the selected source and branch to your installed stock OOS generation. Not every branch boots every ROM.
 
 This git branch is **not** for OP10+ GKI devices. Upstream multi-device WildKernels GKI pipeline lives on **`main`** (reference only; do not develop OP8 features there).
 
@@ -32,7 +31,7 @@ This git branch is **not** for OP10+ GKI devices. Upstream multi-device WildKern
 
 | Mode | What you get |
 |------|----------------|
-| **STOCK** | Non-root baseline (no KernelSU / no SUSFS) — verified on HELLBOY `14` |
+| **STOCK** | Non-root clean-upstream baseline (no KernelSU / no SUSFS) — HELLBOY `14` verified |
 | **KSUN** | [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) built-in (non-GKI 4.19) |
 | **KSUN_SUSFS** | KSUN + [SUSFS](https://gitlab.com/simonpunk/susfs4ksu) (`kernel-4.19`) |
 
@@ -63,10 +62,10 @@ If you leave **Use workflow from = main**, the stub job exits with instructions 
 gh workflow run "Build OP8 Series Kernel (SM8250)" \
   --ref op8series-sm8250-ksu-susfs \
   -f build_mode=STOCK \
-  -f device_profile=ALL_OP8_SERIES \
-  -f kernel_branch=14 \
+  -f device_profile=OP8 \
+  -f source_preset=PPAJDA \
   -f make_release=false \
-  -f clean_build=false \
+  -f clean_build=true \
   -f debug=true
 ```
 
@@ -74,14 +73,15 @@ gh workflow run "Build OP8 Series Kernel (SM8250)" \
 |-------|---------|
 | `build_mode` | `STOCK` / `KSUN` / `KSUN_SUSFS` |
 | `device_profile` | AnyKernel device check filter |
-| `kernel_branch` | **`14`** (default, A14) · **`13.1`** · **`13.1-new`** |
-| `defconfig_override` | Optional (empty = `vendor/oplus-stock_defconfig`) |
+| `source_preset` | `HELLBOY017` / `PPAJDA` / `TORAIDL` |
+| `kernel_branch` | Optional override; must be allowed by the selected source (empty = that preset's default) |
+| `defconfig_override` | Optional (empty = selected source's default defconfig) |
 | `ksun_ref` / `susfs_ref` | For root modes |
 | `clean_build` | `true` = no ccache |
 | `make_release` | Publish a GitHub Release |
 | `debug` | Extra logs on failure |
 
-Source defaults: [`configs/sources.json`](configs/sources.json) (HELLBOY017 only).
+Source defaults and allowed branches: [`configs/sources.json`](configs/sources.json).
 
 ---
 
@@ -89,10 +89,12 @@ Source defaults: [`configs/sources.json`](configs/sources.json) (HELLBOY017 only
 
 ```bash
 # Linux host with clang + aarch64/arm android GCC on PATH
-export KERNEL_BRANCH=14
+export KERNEL_SOURCE=https://github.com/ppajda/android_kernel_oneplus_sm8250.git
+export KERNEL_BRANCH=oos13.1
+export DEFCONFIG=op8_defconfig
 export BUILD_MODE=STOCK          # or KSUN | KSUN_SUSFS
-export DEVICE_PROFILE=ALL_OP8_SERIES
-# optional: KERNEL_SOURCE defaults to HELLBOY017
+export DEVICE_PROFILE=OP8
+export SOURCE_PRESET=PPAJDA
 chmod +x scripts/*.sh
 bash scripts/build.sh
 # output: artifacts/*.zip
@@ -103,7 +105,7 @@ bash scripts/build.sh
 ## Flash / safety
 
 - Unlock bootloader (data wipe).
-- Prefer builds matched to your ROM generation; HELLBOY `14` is stock-oriented CLO.
+- Prefer builds matched to your ROM generation and source/device scope.
 - Keep a stock `boot` backup (MSM/EDL if needed).
 - Flash AnyKernel3 zip via recovery / Kernel Flasher.
 - After major OTA, re-flash a matching build.
@@ -116,14 +118,13 @@ For **KSUN_SUSFS**: install a SUSFS userspace module (e.g. [sidex15/susfs4ksu-mo
 ## Repo layout (this branch)
 
 ```
-configs/sources.json          # HELLBOY017 only
+configs/sources.json          # selectable clean upstream source presets
 configs/build-request.json    # push-triggered build request
 configs/registry.json         # devices + known HELLBOY branches
 scripts/build.sh              # orchestrator
 scripts/apply-ksun.sh
 scripts/apply-susfs.sh
 scripts/add-manual-hooks.sh
-scripts/fix-oplus-stubs.sh
 scripts/package-anykernel.sh
 .github/workflows/build-kernel.yml
 .github/actions/cache/        # ccache restore/save (author pattern from main)
@@ -142,7 +143,7 @@ scripts/package-anykernel.sh
 
 | Branch | Role |
 |--------|------|
-| **`op8series-sm8250-ksu-susfs`** | **Active development** — OP8 series HELLBOY builds only |
+| **`op8series-sm8250-ksu-susfs`** | **Active development** — OP8 series clean-source builds |
 | **`main`** | **Reference only** — upstream GKI / multi-device pipeline. Do not commit OP8 changes there; copy patterns when needed. |
 
 ---
@@ -150,6 +151,8 @@ scripts/package-anykernel.sh
 ## Credits
 
 - [HELLBOY017/kernel_oneplus_sm8250](https://github.com/HELLBOY017/kernel_oneplus_sm8250) (Meteoric / CLO)
+- [ppajda/android_kernel_oneplus_sm8250](https://github.com/ppajda/android_kernel_oneplus_sm8250)
+- [toraidl/android_kernel_oneplus_sm8250](https://github.com/toraidl/android_kernel_oneplus_sm8250)
 - [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next)
 - [simonpunk/susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu)
 - [sidex15/susfs4ksu-module](https://github.com/sidex15/susfs4ksu-module)

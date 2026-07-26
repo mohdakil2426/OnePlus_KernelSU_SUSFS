@@ -2,9 +2,13 @@
 
 ## Scope
 
-This builder **only** uses:
+This builder lets you select one clean upstream source per manual workflow run:
 
-**[HELLBOY017/kernel_oneplus_sm8250](https://github.com/HELLBOY017/kernel_oneplus_sm8250)**
+| Preset | Upstream | Default branch | Defconfig | Device scope |
+|--------|----------|----------------|-----------|--------------|
+| `HELLBOY017` | [HELLBOY017/kernel_oneplus_sm8250](https://github.com/HELLBOY017/kernel_oneplus_sm8250) | `14` | `vendor/oplus-stock_defconfig` | OP8 series |
+| `PPAJDA` | [ppajda/android_kernel_oneplus_sm8250](https://github.com/ppajda/android_kernel_oneplus_sm8250) | `oos13.1` | `op8_defconfig` | OP8 / OP8 Pro / OP8T |
+| `TORAIDL` | [toraidl/android_kernel_oneplus_sm8250](https://github.com/toraidl/android_kernel_oneplus_sm8250) | `op8t` | `vendor/oplus-stock_defconfig` | OP8T / OP9R |
 
 | Device | SoC | Notes |
 |--------|-----|--------|
@@ -13,10 +17,9 @@ This builder **only** uses:
 | OnePlus 8T | SM8250 | codename `kebab` |
 | OnePlus 9R | SM8250-AC | codename `lemonades` |
 
-**Not supported:** other kernel trees (LineageOS, OnePlusOSS, Realking, …), OnePlus 9/9 Pro (SM8350), OP7 series, OP10+ GKI devices.
+**Not supported:** OnePlus 9/9 Pro (SM8350), OP7 series, OP10+ GKI devices.
 
-Default: HELLBOY branch **`14`**, defconfig **`vendor/oplus-stock_defconfig`**.  
-Also selectable: **`13.1`**.
+`STOCK` does not alter the selected kernel source or defconfig. `KSUN` and `KSUN_SUSFS` add only KernelSU-Next and SUSFS integration changes.
 
 ---
 
@@ -29,7 +32,7 @@ Also selectable: **`13.1`**.
 | **`13.1-new`** | A13.1-class refreshed tip (WLAN etc. experiments) |
 | `oos` | Older OOS-oriented (not in CI choices; research only) |
 
-Workflow input: `kernel_branch` = `14` | `13.1` | `13.1-new`.  
+Workflow input: select `source_preset`; leave `kernel_branch` empty to use its default, or enter one of that preset's configured allowed branches.
 **Not all branches boot all stock OOS builds** — match generation to your ROM.
 
 ---
@@ -46,8 +49,8 @@ Workflow input: `kernel_branch` = `14` | `13.1` | `13.1-new`.
 
 ## Important warnings
 
-1. **HELLBOY-only** — not an official OnePlus dump; stock-oriented community CLO tree.
-2. **Non-GKI 4.19** — no LKM install; every change needs a full kernel rebuild.
+1. **Community source trees** — they are not official OnePlus release artifacts; verify boot and hardware behavior on your exact OOS build.
+2. **Non-GKI 4.19** — no LKM install; every KernelSU/SUSFS integration change needs a full kernel rebuild.
 3. **SUSFS patches** may need reject fixes on OEM/community trees — first boots may need patch iteration.
 4. **Unlocked bootloader**; disable verification when required.
 5. **OTA** may replace your kernel — re-flash after major updates.

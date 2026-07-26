@@ -1,6 +1,6 @@
 name: Build OP8 Series Kernel (SM8250)
 
-# Branch: op8series-sm8250-ksu-susfs (HELLBOY017 kernel only)
+# Branch: op8series-sm8250-ksu-susfs (selectable clean upstream sources)
 # Trigger: workflow_dispatch ONLY — same as main's build-kernel-release.yml
 #   (never push / schedule / PR automatic builds)
 # - main is reference-only; do not develop OP8 work there
@@ -32,15 +32,20 @@ on:
           - OP8Pro
           - OP8T
           - OP9R
-      kernel_branch:
-        description: 'HELLBOY branch (14 = A14 default | 13.1 / 13.1-new = A13.1-class)'
+      source_preset:
+        description: 'Kernel source preset'
         required: true
         type: choice
-        default: '14'
+        default: 'HELLBOY017'
         options:
-          - '14'
-          - '13.1'
-          - '13.1-new'
+          - HELLBOY017
+          - PPAJDA
+          - TORAIDL
+      kernel_branch:
+        description: 'Optional supported branch override (empty = source preset default)'
+        required: false
+        type: string
+        default: ''
       defconfig_override:
         description: 'Optional defconfig override (empty = vendor/oplus-stock_defconfig)'
         required: false
@@ -94,11 +99,9 @@ jobs:
           set -euo pipefail
           SOURCES=configs/sources.json
 
-          # Single source only: HELLBOY017
-          # Manual-only (workflow_dispatch) — inputs always present, same idea as main
-          PRESET="HELLBOY017"
+          PRESET="${{ inputs.source_preset }}"
           if ! jq -e --arg p "$PRESET" 'has($p)' "$SOURCES" >/dev/null; then
-            echo "::error::configs/sources.json must define $PRESET"
+            echo "::error::Unknown source_preset=$PRESET"
             exit 1
           fi
 
@@ -109,17 +112,15 @@ jobs:
           CLEAN="${{ inputs.clean_build }}"
           REL="${{ inputs.make_release }}"
           DBG="${{ inputs.debug }}"
-          # HELLBOY product tips only (Android-class lines)
           KBRANCH="${{ inputs.kernel_branch }}"
           DC_OVR="${{ inputs.defconfig_override }}"
-
-          case "$KBRANCH" in
-            14|13.1|13.1-new) ;;
-            *)
-              echo "::error::Unsupported kernel_branch=$KBRANCH (allowed: 14, 13.1, 13.1-new)"
-              exit 1
-              ;;
-          esac
+          if [[ -z "$KBRANCH" ]]; then
+            KBRANCH=$(jq -er --arg p "$PRESET" '.[$p].kernel_branch' "$SOURCES")
+          fi
+          if ! jq -e --arg p "$PRESET" --arg b "$KBRANCH" '.[$p].allowed_branches | index($b)' "$SOURCES" >/dev/null; then
+            echo "::error::Unsupported branch '$KBRANCH' for source_preset=$PRESET"
+            exit 1
+          fi
 
           echo "build_mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "device_profile=$DEV" >> "$GITHUB_OUTPUT"
@@ -129,7 +130,7 @@ jobs:
           echo "make_release=$REL" >> "$GITHUB_OUTPUT"
           echo "debug=$DBG" >> "$GITHUB_OUTPUT"
 
-          # HELLBOY017 only → single-entry matrix (branch from dispatch input)
+          # Manual dispatch always resolves to one selected source and branch.
           MATRIX=$(jq -c \
             --arg p "$PRESET" \
             --arg kbranch "$KBRANCH" \
@@ -142,13 +143,11 @@ jobs:
                 kernel_source: $S.kernel_source,
                 kernel_branch: $kbranch,
                 defconfig: (if $dc_ovr != "" then $dc_ovr else $S.defconfig end),
-                run_oplus_stubs: ($S.run_oplus_stubs // true | tostring),
-                disable_proprietary_oplus_configs: ($S.disable_proprietary_oplus_configs // false | tostring)
               }]
             }
             ' "$SOURCES")
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
-          echo "Resolved matrix (HELLBOY017 · branch $KBRANCH):"
+          echo "Resolved matrix ($PRESET · branch $KBRANCH):"
           echo "$MATRIX" | jq .
           echo "clean_build=$CLEAN"
 
@@ -376,8 +375,6 @@ jobs:
           DEVICE_PROFILE: ${{ needs.resolve.outputs.device_profile }}
           KSUN_REF: ${{ needs.resolve.outputs.ksun_ref }}
           SUSFS_REF: ${{ needs.resolve.outputs.susfs_ref }}
-          RUN_OPLUS_STUBS: ${{ matrix.run_oplus_stubs }}
-          DISABLE_PROPRIETARY_OPLUS_CONFIGS: ${{ matrix.disable_proprietary_oplus_configs }}
           SOURCE_PRESET: ${{ matrix.preset }}
           CLEAN_BUILD: ${{ needs.resolve.outputs.clean_build }}
           ARTIFACT_DIR: ${{ github.workspace }}/artifacts

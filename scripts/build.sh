@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # OnePlus 8 series (SM8250) kernel build orchestrator.
-# Kernel source: HELLBOY017/kernel_oneplus_sm8250 only (this branch).
+# Kernel source selected by the workflow source preset.
 #
 # Required env:
 #   KERNEL_BRANCH   git branch of KERNEL_SOURCE (default tree uses 14)
@@ -9,9 +9,7 @@
 #   KERNEL_SOURCE   git URL (default HELLBOY017)
 #   DEFCONFIG       default vendor/oplus-stock_defconfig
 #   DEVICE_PROFILE  ALL_OP8_SERIES | OP8 | OP8Pro | OP8T | OP9R
-#   SOURCE_PRESET   label for artifacts (HELLBOY017)
-#   RUN_OPLUS_STUBS true|false (default true)
-#   DISABLE_PROPRIETARY_OPLUS_CONFIGS true|false (default false)
+#   SOURCE_PRESET   label for artifacts
 #   CLEAN_BUILD    true = no ccache; false = CC=ccache clang
 #   KSUN_REF / SUSFS_REF / JOBS / ARTIFACT_DIR / WORK_DIR
 
@@ -26,8 +24,6 @@ BUILD_MODE="${BUILD_MODE:?BUILD_MODE is required}"
 DEFCONFIG="${DEFCONFIG:-vendor/oplus-stock_defconfig}"
 DEVICE_PROFILE="${DEVICE_PROFILE:-ALL_OP8_SERIES}"
 SOURCE_PRESET="${SOURCE_PRESET:-HELLBOY017}"
-RUN_OPLUS_STUBS="${RUN_OPLUS_STUBS:-true}"
-DISABLE_PROPRIETARY_OPLUS_CONFIGS="${DISABLE_PROPRIETARY_OPLUS_CONFIGS:-false}"
 CLEAN_BUILD="${CLEAN_BUILD:-false}"
 KSUN_REF="${KSUN_REF:-next}"
 SUSFS_REF="${SUSFS_REF:-kernel-4.19}"
@@ -54,27 +50,6 @@ rm -rf "$KERNEL_DIR"
 git clone --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_SOURCE" "$KERNEL_DIR"
 endgroup
 
-if [[ "$RUN_OPLUS_STUBS" == "true" ]]; then
-  log "Fix incomplete OSS vendor symlinks / missing Kconfigs"
-  ( cd "$KERNEL_DIR" && bash "$SCRIPT_DIR/fix-oplus-stubs.sh" )
-  endgroup
-else
-  log "Skipping oplus stubs (RUN_OPLUS_STUBS=$RUN_OPLUS_STUBS)"
-  endgroup
-fi
-
-# vDSO clang fix (common on 4.19 + modern clang)
-log "vDSO clang compatibility"
-for f in \
-  "$KERNEL_DIR/arch/arm64/kernel/vdso/Makefile" \
-  "$KERNEL_DIR/arch/arm64/kernel/vdso32/Makefile"
-do
-  if [[ -f "$f" ]] && ! grep -q -- '-g0' "$f"; then
-    echo 'ccflags-y += -g0' >> "$f"
-  fi
-done
-endgroup
-
 if [[ "$ENABLE_KSUN" == "true" ]]; then
   log "KernelSU-Next"
   export KSUN_REF KERNEL_DIR
@@ -98,7 +73,7 @@ if [[ "$ENABLE_SUSFS" == "true" ]]; then
   endgroup
 fi
 
-log "Configure $DEFCONFIG"
+log "Configure upstream $DEFCONFIG"
 cd "$KERNEL_DIR"
 
 # Prefer clang if present; wrap with ccache unless CLEAN_BUILD (author pattern)
@@ -135,88 +110,9 @@ else
   MAKE_ARGS+=(CROSS_COMPILE=aarch64-linux-gnu-)
 fi
 
-# Seed the defconfig before invoking Kconfig. HELLBOY 13.1 / 13.1-new prompt for
-# LITTLE_CPU_MASK / BIG_CPU_MASK / PRIME_CPU_MASK (int, no default); the stock
-# defconfig omits them, so invoking `make <defconfig>` first hangs non-interactive CI.
 DEFCONFIG_PATH="arch/arm64/configs/$DEFCONFIG"
 [[ -f "$DEFCONFIG_PATH" ]] || die "defconfig not found: $DEFCONFIG_PATH"
-mkdir -p out
-cp "$DEFCONFIG_PATH" out/.config
-
-# Values match same-tree vendor/kona-perf_defconfig (SM8250). Branch 14 has no
-# such symbols, so it keeps the normal olddefconfig path unchanged.
-if [[ -f arch/arm64/Kconfig ]] \
-  && grep -q '^config LITTLE_CPU_MASK' arch/arm64/Kconfig 2>/dev/null; then
-  log "Pre-seed LITTLE/BIG/PRIME_CPU_MASK for noninteractive conf (13.1-class trees)"
-  ./scripts/config --file out/.config --set-val LITTLE_CPU_MASK 15
-  ./scripts/config --file out/.config --set-val BIG_CPU_MASK 112
-  ./scripts/config --file out/.config --set-val PRIME_CPU_MASK 128
-  grep -E 'CONFIG_(LITTLE|BIG|PRIME)_CPU_MASK' out/.config || true
-  endgroup
-fi
-
-make "${MAKE_ARGS[@]}" olddefconfig
-
-if [[ "$DISABLE_PROPRIETARY_OPLUS_CONFIGS" == "true" ]]; then
-  log "Disable proprietary OPLUS configs (incomplete OSS trees)"
-  if [[ -f out/.config ]]; then
-    for opt in \
-      LOCKING_PROTECT \
-      OPLUS_LOCKING_STRATEGY \
-      OPLUS_LOCKING_OSQ \
-      OPLUS_LOCKING_MONITOR \
-      OPLUS_SCHED \
-      OPLUS_CTP \
-      TOUCHPANEL_OPLUS \
-      OPLUS_TP_APK \
-      OPLUS_FW_UPDATE \
-      OPLUS_SM8250_CHARGER \
-      OPLUS_CHIP_SOC_NODE \
-      OPLUS_FEATURE_UID_PERF
-    do
-      ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
-    done
-    while IFS= read -r line; do
-      opt="${line#CONFIG_}"
-      opt="${opt%%=*}"
-      [[ -z "$opt" ]] && continue
-      ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
-    done < <(grep -E '^CONFIG_OPLUS[A-Z0-9_]*=' out/.config || true)
-  fi
-  endgroup
-else
-  log "Keeping OPLUS configs (community tree)"
-  endgroup
-fi
-
-# Community OP8 trees often enable BOTH generic Synaptics (dsx/tcm) and Oplus
-# touch panel stacks → link errors (response_complete, active_panel). Keep Oplus.
-log "Disable generic Synaptics touch (keep Oplus touchscreen stack)"
-if [[ -f out/.config ]]; then
-  while IFS= read -r line; do
-    opt="${line#CONFIG_}"
-    opt="${opt%%=*}"
-    [[ -z "$opt" ]] && continue
-    ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
-  done < <(grep -E '^CONFIG_TOUCHSCREEN_SYNAPTICS' out/.config || true)
-  # Common names even if not yet expanded in .config
-  for opt in \
-    TOUCHSCREEN_SYNAPTICS_TCM \
-    TOUCHSCREEN_SYNAPTICS_TCM_CORE \
-    TOUCHSCREEN_SYNAPTICS_TCM_SPI \
-    TOUCHSCREEN_SYNAPTICS_TCM_I2C \
-    TOUCHSCREEN_SYNAPTICS_DSX \
-    TOUCHSCREEN_SYNAPTICS_DSX_CORE \
-    TOUCHSCREEN_SYNAPTICS_DSX_I2C \
-    TOUCHSCREEN_SYNAPTICS_DSX_SPI \
-    TOUCHSCREEN_SYNAPTICS_DSX_RMI_HID_I2C \
-    TOUCHSCREEN_SYNAPTICS_I2C_RMI4
-  do
-    ./scripts/config --file out/.config -d "$opt" 2>/dev/null || true
-  done
-  grep -E 'SYNAPTICS|TOUCHPANEL' out/.config | head -40 || true
-fi
-endgroup
+make "${MAKE_ARGS[@]}" "$DEFCONFIG"
 
 # Re-open configure group for remaining config tweaks
 log "Apply optional KSU/SUSFS config symbols"
@@ -247,80 +143,11 @@ if [[ "$ENABLE_SUSFS" == "true" ]]; then
   done
 fi
 
-make "${MAKE_ARGS[@]}" olddefconfig
-# Confirm critical symbols off/on
-grep -E 'CONFIG_LOCKING_PROTECT|CONFIG_KSU|CONFIG_OPLUS' out/.config | head -40 || true
-endgroup
-
-# HELLBOY 13.1-class cpuset.c declares cs_target only when CPUSET_ASSIST is
-# enabled, but uses it in an unconditional helper. Guard that helper as well.
-if [[ "$KERNEL_BRANCH" == "13.1" || "$KERNEL_BRANCH" == "13.1-new" ]]; then
-  log "Guard disabled CPUSET_ASSIST helper (13.1-class trees)"
-  python3 - "$KERNEL_DIR/kernel/cgroup/cpuset.c" <<'PY'
-from pathlib import Path
-import sys
-
-path = Path(sys.argv[1])
-source = path.read_text()
-start = "\nstatic ssize_t cpuset_write_resmask_assist("
-end = "\nstatic ssize_t cpuset_write_resmask_wrapper("
-begin = source.find(start)
-finish = source.find(end, begin)
-if begin == -1 or finish == -1 or "struct cs_target tgt" not in source[begin:finish]:
-    raise SystemExit("error: expected cpuset assist helper was not found")
-source = source[:begin] + "\n#ifdef CONFIG_CPUSET_ASSIST" + source[begin:finish] + "\n#endif\n" + source[finish:]
-path.write_text(source)
-PY
-  python3 - "$KERNEL_DIR/kernel/sched/tune.c" <<'PY'
-from pathlib import Path
-import sys
-
-path = Path(sys.argv[1])
-source = path.read_text()
-callbacks = (
-    (".write_u64 = sched_boost_override_write_wrapper,", "sched_boost_override_write"),
-    (".write_u64 = sched_colocate_write_wrapper,", "sched_colocate_write"),
-    (".write_s64 = boost_write_wrapper,", "boost_write"),
-    (".write_u64 = prefer_idle_write_wrapper,", "prefer_idle_write"),
-)
-for guarded, base in callbacks:
-    if source.count(guarded) != 1:
-        raise SystemExit(f"error: expected {guarded} exactly once")
-    replacement = f"#ifdef CONFIG_STUNE_ASSIST\n\t\t{guarded}\n#else\n\t\t.write_{'s64' if 'write_s64' in guarded else 'u64'} = {base},\n#endif"
-    source = source.replace(guarded, replacement)
-path.write_text(source)
-PY
-  python3 - "$KERNEL_DIR/kernel/sysctl.c" <<'PY'
-from pathlib import Path
-import sys
-
-path = Path(sys.argv[1])
-source = path.read_text()
-needle = "static int two_hundred_fifty_five = 255;"
-first = source.find(needle)
-second = source.find(needle, first + len(needle))
-if first == -1 or second == -1 or source.find(needle, second + len(needle)) != -1:
-    raise SystemExit("error: expected two sysctl limit declarations")
-line_end = source.find("\n", second)
-source = source[:second] + source[line_end + 1:]
-path.write_text(source)
-PY
-  python3 - "$KERNEL_DIR/drivers/gpu/drm/drm_atomic.c" <<'PY'
-from pathlib import Path
-import sys
-
-path = Path(sys.argv[1])
-source = path.read_text()
-start = "\n\t/* Boost CPU and DDR when committing a new frame */"
-end = "\n\tdrm_modeset_acquire_init(&ctx, DRM_MODESET_ACQUIRE_INTERRUPTIBLE);"
-begin = source.find(start)
-finish = source.find(end, begin)
-if begin == -1 or finish == -1 or source.count("last_input_time") != 1:
-    raise SystemExit("error: expected orphaned DRM input boost block")
-path.write_text(source[:begin] + source[finish:])
-PY
-  endgroup
+if [[ "$ENABLE_KSUN" == "true" || "$ENABLE_SUSFS" == "true" ]]; then
+  make "${MAKE_ARGS[@]}" olddefconfig
 fi
+grep -E 'CONFIG_KSU|CONFIG_KSU_SUSFS' out/.config | head -40 || true
+endgroup
 
 log "Compile Image (jobs=$JOBS)"
 # Explicit Image target (skip unavailable vendor modules). Capture exit of make, not tee.

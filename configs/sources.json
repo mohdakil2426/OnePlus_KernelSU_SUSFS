@@ -5,8 +5,22 @@
     "kernel_branch": "14",
     "allowed_branches": ["14", "13.1", "13.1-new"],
     "defconfig": "vendor/oplus-stock_defconfig",
-    "run_oplus_stubs": true,
-    "disable_proprietary_oplus_configs": false,
     "notes": "Default 14 (A14-class). 13.1 / 13.1-new = A13.1-class tips. Match to your OOS generation."
+  },
+  "PPAJDA": {
+    "label": "ppajda OOS 13.1 (OnePlus 8 series)",
+    "kernel_source": "https://github.com/ppajda/android_kernel_oneplus_sm8250.git",
+    "kernel_branch": "oos13.1",
+    "allowed_branches": ["oos13.1"],
+    "defconfig": "op8_defconfig",
+    "notes": "Stock-source baseline for OnePlus 8 / 8 Pro / 8T. No builder source workarounds are applied."
+  },
+  "TORAIDL": {
+    "label": "toraidl stock OOS (OnePlus 8T / 9R)",
+    "kernel_source": "https://github.com/toraidl/android_kernel_oneplus_sm8250.git",
+    "kernel_branch": "op8t",
+    "allowed_branches": ["op8t"],
+    "defconfig": "vendor/oplus-stock_defconfig",
+    "notes": "Stock-source baseline for OnePlus 8T / 9R. No builder source workarounds are applied."
   }
 }
