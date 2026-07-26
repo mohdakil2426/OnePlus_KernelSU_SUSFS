@@ -2,7 +2,9 @@
 
 ## Scope
 
-This builder lets you select one source preset per manual workflow run:
+This builder keeps source metadata for the OP8 series. The current manual
+workflow exposes only OP8-compatible presets because its verified AnyKernel
+installer targets `instantnoodle`:
 
 | Preset | Upstream | Default branch | Defconfig | Device scope |
 |--------|----------|----------------|-----------|--------------|
@@ -52,6 +54,12 @@ Workflow input: select `source_preset`; leave `kernel_branch` empty to use its d
 | `STOCK` | No | No | Baseline; official presets may include their declared compatibility patch |
 | `KSUN` | KernelSU-Next | No | Root without SUSFS |
 | `KSUN_SUSFS` | KernelSU-Next | Yes (`kernel-4.19`) | Root + hide stack |
+
+This is the OnePlus equivalent of keeping SUSFS optional in the Marble
+workflow, but not the same integration. Marble's verified
+`pershoot/KernelSU-Next@dev-susfs` path targets Android 12 / Linux 5.10 GKI.
+The OnePlus 4.19 non-GKI path deliberately stays on the official immutable
+KernelSU-Next revision and applies this repository's fail-closed ABI bridge.
 
 The OP8 clean request is immutable: KernelSU-Next
 `53791c92bff13d62338f29cc9da035a37652ca91`

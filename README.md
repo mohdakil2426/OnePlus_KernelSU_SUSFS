@@ -46,6 +46,12 @@ This git branch is **not** for OP10+ GKI devices. Upstream multi-device WildKern
 - The verified OP8 request pins KernelSU-Next `53791c92bff13d62338f29cc9da035a37652ca91`
   (`v3.2.0-legacy-13-g53791c92`) and official SUSFS 4.19
   `001e69919c6271f690fd00b17e4c721c9e599152` (`v1.5.5`).
+- SUSFS is optional: choose `KSUN` for official KernelSU-Next alone or
+  `KSUN_SUSFS` for the verified 4.19 SUSFS port. The Marble project's
+  `pershoot/dev-susfs` result is a useful optional-manager pattern, but that
+  Android 12 / Linux 5.10 fork is **not** used here. This non-GKI 4.19 build
+  keeps the official pinned KernelSU-Next source and its audited compatibility
+  bridge.
 - Flashable **AnyKernel3** ZIP, using WildKernels framework commit
   `e1e9dce98430c5c6f231f7094a8c7f4ecaf50948` plus a repo-owned,
   OP8-only non-GKI installer.
@@ -85,9 +91,12 @@ GitHub only shows **Run workflow** if a same-named workflow file exists on the *
 1. Open **Actions** → **Build OP8 Series Kernel (SM8250)**.
 2. Click **Run workflow** (right side).
 3. **Use workflow from:** select **`op8series-sm8250-ksu-susfs`** (important — not `main`).
-4. Set inputs → **Run workflow**.
+4. Pick `STOCK`, `KSUN`, or `KSUN_SUSFS`, choose an OP8-compatible source, then
+   click **Run workflow**.
 
 If you leave **Use workflow from = main**, the stub job exits with instructions (no kernel build).
+The current form intentionally exposes only **OnePlus 8** because the verified
+AnyKernel installer is scoped to `instantnoodle`.
 
 ### CLI (always works)
 
@@ -98,8 +107,6 @@ gh workflow run "Build OP8 Series Kernel (SM8250)" \
   -f device_profile=OP8 \
   -f source_preset=ONEPLUSOSS_OP8_OOS13_1 \
   -f kernel_branch=oneplus/sm8250_t_13.1_op8 \
-  -f ksun_ref=53791c92bff13d62338f29cc9da035a37652ca91 \
-  -f susfs_ref=001e69919c6271f690fd00b17e4c721c9e599152 \
   -f make_release=false \
   -f clean_build=true \
   -f debug=true
@@ -107,17 +114,47 @@ gh workflow run "Build OP8 Series Kernel (SM8250)" \
 
 | Input | Purpose |
 |-------|---------|
-| `build_mode` | `STOCK` / `KSUN` / `KSUN_SUSFS` |
-| `device_profile` | AnyKernel device check filter |
-| `source_preset` | `HELLBOY017` / `PPAJDA` / `TORAIDL` / exact-device `ONEPLUSOSS_*` OOS preset |
+| `build_mode` | `STOCK` / `KSUN` / `KSUN_SUSFS` (SUSFS is optional) |
+| `device_profile` | Fixed to verified `OP8` / `instantnoodle` |
+| `source_preset` | `HELLBOY017` / `PPAJDA` / `ONEPLUSOSS_OP8_OOS13_1` |
 | `kernel_branch` | Optional override; must be allowed by the selected source (empty = that preset's default) |
-| `defconfig_override` | Optional (empty = selected source's default defconfig) |
-| `ksun_ref` / `susfs_ref` | For root modes |
 | `clean_build` | `true` = no ccache |
-| `make_release` | Publish a GitHub Release |
+| `make_release` | Create a draft GitHub Release after success |
 | `debug` | Extra logs on failure |
 
 Source defaults and allowed branches: [`configs/sources.json`](configs/sources.json).
+The verified KernelSU-Next and SUSFS revisions come from
+[`configs/build-request.json`](configs/build-request.json); the Run form cannot
+replace them with floating refs.
+
+### Output names and summary
+
+ZIP names have one locked, readable format:
+
+```text
+AK3_<device>_<source-preset>_<mode>[_susfs-vX.Y.Z]_k<kernel-version>_r<run>.zip
+```
+
+For the verified request:
+
+```text
+AK3_op8_oneplusoss-op8-oos13-1_ksun_susfs-v1.5.5_k4.19.157_rN.zip
+```
+
+The Actions artifact is named
+`op8-flash-<source-preset>-<mode>-r<run>` and contains:
+
+```text
+├─ AK3_*.zip
+├─ AK3_*.zip.sha256
+├─ Image
+├─ build-info.txt
+└─ build-summary.md
+```
+
+The same structured summary is shown on the Actions run and used as opt-in
+draft release notes. It records exact source, KernelSU-Next, SUSFS, and
+AnyKernel revisions plus Image/ZIP checksums and the physical-boot warning.
 
 ---
 
@@ -154,10 +191,10 @@ For **KSUN_SUSFS**: install a SUSFS userspace module (e.g. [sidex15/susfs4ksu-mo
 | Change | Kernel-level effect | Main risk | Current evidence |
 |--------|---------------------|-----------|------------------|
 | OnePlus compatibility set | Repairs invalid prototypes, GSI symbol generation, and RTIC BSS placement without changing the defconfig | Low, but still changes compiled source | Clean STOCK CI baseline passed |
-| KernelSU-Next manual hooks | Hooks exec/open/read/stat, input safe mode, reboot supercall, and the 4.19 unmount path | Medium; a wrong hook placement can panic or break early userspace | Exact-tree compile and link passed locally |
-| SUSFS v1.5.5 | Changes VFS, mount namespace, proc/fdinfo, stat, uname, and task state paths | Medium to high; OEM-port mistakes can cause boot or runtime faults | Rebased patch applies cleanly; SUSFS and final Image link passed locally |
-| Current-KSU/SUSFS bridge | Connects the official SUSFS 4.19 ABI to the current KernelSU-Next layout | Medium; ABI mismatch can break root/SUSFS behavior | Contract tests and exact-tree compile/link passed locally |
-| OP8 AnyKernel installer | Replaces the active-slot `boot` kernel only for `instantnoodle` | High if flashed on the wrong ROM/device or without a backup | ZIP validator passed; no physical-device flash test yet |
+| KernelSU-Next manual hooks | Hooks exec/open/read/stat, input safe mode, reboot supercall, and the 4.19 unmount path | Medium; a wrong hook placement can panic or break early userspace | Clean GitHub CI compiled and linked the exact OP8 tree |
+| SUSFS v1.5.5 | Changes VFS, mount namespace, proc/fdinfo, stat, uname, and task state paths | Medium to high; OEM-port mistakes can cause boot or runtime faults | Clean GitHub CI compiled `fs/susfs.o` and linked the final Image |
+| Current-KSU/SUSFS bridge | Connects the official SUSFS 4.19 ABI to the current KernelSU-Next layout | Medium; ABI mismatch can break root/SUSFS behavior | Contract tests and clean GitHub compile/link passed |
+| OP8 AnyKernel installer | Replaces the active-slot `boot` kernel only for `instantnoodle` | High if flashed on the wrong ROM/device or without a backup | Downloaded CI ZIP revalidated; no physical-device flash test yet |
 
 Build success proves compilation and package structure, **not** boot safety. Keep a
 known-good stock `boot.img`, verify the installed ROM is OP8 OOS 13.1-compatible,
@@ -171,7 +208,7 @@ included, but it cannot recover every early boot failure.
 ```
 configs/sources.json          # selectable source and compatibility metadata
 patches/                      # audited source-specific compatibility repairs
-configs/build-request.json    # push-triggered build request
+configs/build-request.json    # verified immutable integration pins
 configs/registry.json         # devices + known HELLBOY branches
 scripts/build.sh              # orchestrator
 scripts/apply-ksun.sh
@@ -218,6 +255,7 @@ scripts/verify-anykernel.sh
 ## Docs
 
 - [compatibility.md](compatibility.md) (in repo)
+- [Pinned versions and Actions](docs/versions.md)
 - [Community sources research](../docs/reports/sm8250-community-kernel-sources-research.md) (parent `docs/`)
 - [SM8250 KSUN/SUSFS feasibility](../docs/reports/sm8250-ksun-susfs-build-feasibility-report.md) (parent `docs/`)
 - Project memory: `../memory-bank/` (local, not in git)
