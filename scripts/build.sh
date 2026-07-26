@@ -75,8 +75,9 @@ if [[ -n "$COMPANION_SOURCE" || -n "$COMPANION_BRANCH" ]]; then
     oneplusoss-sm8250-strict-prototypes)
       PATCH_FILE="$ROOT_DIR/patches/oneplusoss-sm8250-strict-prototypes.patch"
       [[ -f "$PATCH_FILE" ]] || die "source patch not found: $PATCH_FILE"
-      git -C "$COMPANION_DIR" apply --check "$PATCH_FILE"
-      git -C "$COMPANION_DIR" apply "$PATCH_FILE"
+      # OnePlus publishes the display source with mixed CRLF/LF endings.
+      git -C "$COMPANION_DIR" apply --check --ignore-space-change "$PATCH_FILE"
+      git -C "$COMPANION_DIR" apply --ignore-space-change "$PATCH_FILE"
       echo "Applied source patch set: $SOURCE_PATCH_SET"
       ;;
     *)

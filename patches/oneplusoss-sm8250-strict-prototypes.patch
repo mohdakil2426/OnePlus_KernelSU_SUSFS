@@ -7,7 +7,7 @@ index 45d62e6120ce..1dc3f25689d4 100755
 +void __exit oplus_display_panel_exit(void)
  {
 diff --git a/vendor/oplus/kernel/system/uboot_log/uboot_log.c b/vendor/oplus/kernel/system/uboot_log/uboot_log.c
-index b6e45c3be1ca..4a1d173e7c3b 100644
+index b6e45c3be1ca..4a1d173e7c3b 100755
 --- a/vendor/oplus/kernel/system/uboot_log/uboot_log.c
 +++ b/vendor/oplus/kernel/system/uboot_log/uboot_log.c
 @@ -170,2 +170,2 @@

@@ -25,7 +25,7 @@ Build **STOCK**, **KernelSU-Next**, or **KernelSU-Next + SUSFS** kernels for the
 
 Community-source `STOCK` builds remain clean upstream builds. Official `ONEPLUSOSS_*` STOCK builds apply the audited `oneplusoss-sm8250-strict-prototypes` compatibility patch, which corrects two invalid function signatures without changing their behavior; their artifacts are therefore stock-derived, not byte-for-byte upstream. The selected defconfig remains unchanged. `KSUN` and `KSUN_SUSFS` add only the requested KernelSU-Next and SUSFS integrations.
 
-The official `ONEPLUSOSS_*` presets compose both matching OnePlus repositories: the kernel tree and `android_kernel_modules_and_devicetree_oneplus_sm8250`. The latter supplies the `vendor/` and `techpack/` targets referenced by the kernel tree's symlinks. The builder then applies its declared compatibility patch with `git apply --check`, so upstream drift fails instead of being patched fuzzily.
+The official `ONEPLUSOSS_*` presets compose both matching OnePlus repositories: the kernel tree and `android_kernel_modules_and_devicetree_oneplus_sm8250`. The latter supplies the `vendor/` and `techpack/` targets referenced by the kernel tree's symlinks. The builder then applies its declared compatibility patch with `git apply --check --ignore-space-change`; the whitespace option handles OnePlus's mixed line endings while the signature context still fails if the target code changes.
 
 Those presets also follow the published OnePlus build configuration: Android Clang `r399163b` (11.0.5), `LLVM=1`, and the matching `aarch64-linux-gnu` / `arm-linux-gnueabi` GNU assembler tools. Community presets retain their existing ZyC Clang profile.
 
