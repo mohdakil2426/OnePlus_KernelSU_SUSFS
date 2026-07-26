@@ -79,8 +79,8 @@ if [[ -n "$COMPANION_SOURCE" || -n "$COMPANION_BRANCH" ]]; then
       [[ -f "$KERNEL_PATCH_FILE" ]] || die "source patch not found: $KERNEL_PATCH_FILE"
       [[ -f "$COMPANION_PATCH_FILE" ]] || die "source patch not found: $COMPANION_PATCH_FILE"
       # OnePlus publishes affected sources with mixed CRLF/LF endings.
-      git -C "$KERNEL_DIR" apply --check --ignore-space-change "$KERNEL_PATCH_FILE"
-      git -C "$KERNEL_DIR" apply --ignore-space-change "$KERNEL_PATCH_FILE"
+      git -C "$KERNEL_DIR" apply --check --unidiff-zero --ignore-space-change "$KERNEL_PATCH_FILE"
+      git -C "$KERNEL_DIR" apply --unidiff-zero --ignore-space-change "$KERNEL_PATCH_FILE"
       git -C "$COMPANION_DIR" apply --check --ignore-space-change "$COMPANION_PATCH_FILE"
       git -C "$COMPANION_DIR" apply --ignore-space-change "$COMPANION_PATCH_FILE"
       echo "Applied source patch set: $SOURCE_PATCH_SET"
