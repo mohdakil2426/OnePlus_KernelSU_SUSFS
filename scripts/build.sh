@@ -7,6 +7,7 @@
 #   BUILD_MODE      STOCK | KSUN | KSUN_SUSFS
 # Optional:
 #   KERNEL_SOURCE   git URL (default HELLBOY017)
+#   COMPANION_SOURCE / COMPANION_BRANCH for split official source releases
 #   DEFCONFIG       default vendor/oplus-stock_defconfig
 #   DEVICE_PROFILE  ALL_OP8_SERIES | OP8 | OP8Pro | OP8T | OP9R
 #   SOURCE_PRESET   label for artifacts
@@ -20,6 +21,8 @@ SCRIPT_DIR="$ROOT_DIR/scripts"
 
 KERNEL_SOURCE="${KERNEL_SOURCE:-https://github.com/HELLBOY017/kernel_oneplus_sm8250.git}"
 KERNEL_BRANCH="${KERNEL_BRANCH:?KERNEL_BRANCH is required}"
+COMPANION_SOURCE="${COMPANION_SOURCE:-}"
+COMPANION_BRANCH="${COMPANION_BRANCH:-}"
 BUILD_MODE="${BUILD_MODE:?BUILD_MODE is required}"
 DEFCONFIG="${DEFCONFIG:-vendor/oplus-stock_defconfig}"
 DEVICE_PROFILE="${DEVICE_PROFILE:-ALL_OP8_SERIES}"
@@ -45,10 +48,38 @@ esac
 mkdir -p "$WORK_DIR" "$ARTIFACT_DIR"
 KERNEL_DIR="$WORK_DIR/kernel"
 
-log "Clone kernel $KERNEL_SOURCE @ $KERNEL_BRANCH"
-rm -rf "$KERNEL_DIR"
-git clone --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_SOURCE" "$KERNEL_DIR"
-endgroup
+if [[ -n "$COMPANION_SOURCE" || -n "$COMPANION_BRANCH" ]]; then
+  [[ -n "$COMPANION_SOURCE" && -n "$COMPANION_BRANCH" ]] ||
+    die "COMPANION_SOURCE and COMPANION_BRANCH must be set together"
+
+  # Official OnePlus releases are split across two repositories. Their kernel
+  # symlinks assume the source is located at kernel/msm-4.19 and resolve vendor
+  # components from the shared workspace root.
+  OFFICIAL_LAYOUT="$WORK_DIR/official"
+  COMPANION_DIR="$WORK_DIR/official-companion"
+  KERNEL_DIR="$OFFICIAL_LAYOUT/kernel/msm-4.19"
+
+  log "Assemble official source workspace"
+  rm -rf "$OFFICIAL_LAYOUT" "$COMPANION_DIR"
+  mkdir -p "$(dirname "$KERNEL_DIR")"
+  git clone --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_SOURCE" "$KERNEL_DIR"
+  git clone --depth=1 -b "$COMPANION_BRANCH" "$COMPANION_SOURCE" "$COMPANION_DIR"
+  rsync -a "$COMPANION_DIR/vendor/" "$OFFICIAL_LAYOUT/vendor/"
+  rsync -a "$COMPANION_DIR/kernel/msm-4.19/" "$KERNEL_DIR/"
+  rm -rf "$COMPANION_DIR"
+
+  BROKEN_LINKS=$(find "$KERNEL_DIR" -xtype l -print)
+  if [[ -n "$BROKEN_LINKS" ]]; then
+    printf '%s\n' "$BROKEN_LINKS" >&2
+    die "official source workspace contains broken symlinks"
+  fi
+  endgroup
+else
+  log "Clone kernel $KERNEL_SOURCE @ $KERNEL_BRANCH"
+  rm -rf "$KERNEL_DIR"
+  git clone --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_SOURCE" "$KERNEL_DIR"
+  endgroup
+fi
 
 if [[ "$ENABLE_KSUN" == "true" ]]; then
   log "KernelSU-Next"
@@ -187,6 +218,8 @@ endgroup
   echo "source_preset=$SOURCE_PRESET"
   echo "kernel_source=$KERNEL_SOURCE"
   echo "kernel_branch=$KERNEL_BRANCH"
+  echo "companion_source=$COMPANION_SOURCE"
+  echo "companion_branch=$COMPANION_BRANCH"
   echo "build_mode=$BUILD_MODE"
   echo "defconfig=$DEFCONFIG"
   echo "device_profile=$DEVICE_PROFILE"

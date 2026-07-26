@@ -25,6 +25,8 @@ Build **STOCK**, **KernelSU-Next**, or **KernelSU-Next + SUSFS** kernels for the
 
 `STOCK` builds are clean upstream builds: the builder does not patch source files or rewrite the selected defconfig. `KSUN` and `KSUN_SUSFS` only add the requested KernelSU-Next and SUSFS integrations.
 
+The official `ONEPLUSOSS_*` presets compose both matching OnePlus repositories: the kernel tree and `android_kernel_modules_and_devicetree_oneplus_sm8250`. The latter supplies the `vendor/` and `techpack/` targets referenced by the kernel tree's symlinks; this is source assembly, not a kernel patch.
+
 Match the selected source and branch to your installed stock OOS generation. Not every branch boots every ROM.
 
 This git branch is **not** for OP10+ GKI devices. Upstream multi-device WildKernels GKI pipeline lives on **`main`** (reference only; do not develop OP8 features there).

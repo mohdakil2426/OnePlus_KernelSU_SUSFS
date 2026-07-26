@@ -146,6 +146,8 @@ jobs:
                 preset: $p,
                 kernel_source: $S.kernel_source,
                 kernel_branch: $kbranch,
+                companion_source: ($S.companion_source // ""),
+                companion_branch: ($S.companion_branch // ""),
                 defconfig: (if $dc_ovr != "" then $dc_ovr else $S.defconfig end)
               }]
             }
@@ -374,6 +376,8 @@ jobs:
         env:
           KERNEL_SOURCE: ${{ matrix.kernel_source }}
           KERNEL_BRANCH: ${{ matrix.kernel_branch }}
+          COMPANION_SOURCE: ${{ matrix.companion_source }}
+          COMPANION_BRANCH: ${{ matrix.companion_branch }}
           BUILD_MODE: ${{ needs.resolve.outputs.build_mode }}
           DEFCONFIG: ${{ matrix.defconfig }}
           DEVICE_PROFILE: ${{ needs.resolve.outputs.device_profile }}
