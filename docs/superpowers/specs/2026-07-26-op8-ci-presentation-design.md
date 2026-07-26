@@ -76,7 +76,7 @@ AK3_op8_oneplusoss-op8-oos13-1_ksun_susfs-v1.5.5_k4.19.157_r42.zip
 Locked Actions artifact format:
 
 ```text
-op8-flash-<source-preset>-<mode>-r<run>
+op8-flash-<source-preset>-<mode>[-susfs-vX.Y.Z]-r<run>
 ```
 
 The run number is stable for the Actions build. Local metadata tests use

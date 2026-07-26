@@ -143,7 +143,7 @@ AK3_op8_oneplusoss-op8-oos13-1_ksun_susfs-v1.5.5_k4.19.157_rN.zip
 ```
 
 The Actions artifact is named
-`op8-flash-<source-preset>-<mode>-r<run>` and contains:
+`op8-flash-<source-preset>-<mode>[-susfs-vX.Y.Z]-r<run>` and contains:
 
 ```text
 ├─ AK3_*.zip
