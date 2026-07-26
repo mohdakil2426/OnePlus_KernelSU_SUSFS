@@ -135,21 +135,26 @@ else
   MAKE_ARGS+=(CROSS_COMPILE=aarch64-linux-gnu-)
 fi
 
-make "${MAKE_ARGS[@]}" "$DEFCONFIG"
+# Seed the defconfig before invoking Kconfig. HELLBOY 13.1 / 13.1-new prompt for
+# LITTLE_CPU_MASK / BIG_CPU_MASK (int, no default); vendor/oplus-stock_defconfig
+# omits them, so invoking `make <defconfig>` first hangs non-interactive CI.
+DEFCONFIG_PATH="arch/arm64/configs/$DEFCONFIG"
+[[ -f "$DEFCONFIG_PATH" ]] || die "defconfig not found: $DEFCONFIG_PATH"
+mkdir -p out
+cp "$DEFCONFIG_PATH" out/.config
 
-# HELLBOY 13.1 / 13.1-new: arch/arm64/Kconfig prompts LITTLE_CPU_MASK / BIG_CPU_MASK
-# (int, no default) but vendor/oplus-stock_defconfig does not set them → conf hangs in
-# non-interactive CI ("Error in reading or end of file" loop). Branch 14 removed these
-# symbols. Values match same-tree vendor/kona-perf_defconfig (SM8250).
-# Applies whenever the symbols exist (13.1 and 13.1-new); no-op on 14.
-if [[ -f out/.config ]] && [[ -f arch/arm64/Kconfig ]] \
+# Values match same-tree vendor/kona-perf_defconfig (SM8250). Branch 14 has no
+# such symbols, so it keeps the normal olddefconfig path unchanged.
+if [[ -f arch/arm64/Kconfig ]] \
   && grep -q '^config LITTLE_CPU_MASK' arch/arm64/Kconfig 2>/dev/null; then
-  log "Set LITTLE/BIG_CPU_MASK for noninteractive conf (13.1-class trees)"
+  log "Pre-seed LITTLE/BIG_CPU_MASK for noninteractive conf (13.1-class trees)"
   ./scripts/config --file out/.config --set-val LITTLE_CPU_MASK 15
   ./scripts/config --file out/.config --set-val BIG_CPU_MASK 112
   grep -E 'CONFIG_(LITTLE|BIG)_CPU_MASK' out/.config || true
   endgroup
 fi
+
+make "${MAKE_ARGS[@]}" olddefconfig
 
 if [[ "$DISABLE_PROPRIETARY_OPLUS_CONFIGS" == "true" ]]; then
   log "Disable proprietary OPLUS configs (incomplete OSS trees)"
