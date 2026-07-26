@@ -60,8 +60,8 @@ This git branch is **not** for OP10+ GKI devices. Upstream multi-device WildKern
 
 ### Verified OP8 root build
 
-[Clean run 30208343645](https://github.com/mohdakil2426/OnePlus_KernelSU_SUSFS/actions/runs/30208343645)
-passed on integration commit `0f9c05d90d7a42a7887c4fd5e5eb938a44faac7c`.
+[Clean run 30213621719](https://github.com/mohdakil2426/OnePlus_KernelSU_SUSFS/actions/runs/30213621719)
+passed on builder commit `8ba29d19acf2dd17a923dd363f7f6b7cdae2574e`.
 It used the official OP8 OOS 13.1 kernel revision
 `9fdb3aa681ecbafa77e160bd93d0740537c6457c`, matching companion revision
 `dab8a261393373f8be4e85209eafcdf0d5f461cb`, Android Clang 11.0.5
@@ -69,14 +69,15 @@ It used the official OP8 OOS 13.1 kernel revision
 
 | Output | SHA-256 |
 |--------|---------|
-| `Image` | `74f83b13371cea1f611373f0703be14ecf1ac16efa52a769e44d81f164fc8132` |
-| AnyKernel ZIP | `a2f3202e79f0c7c1cc6e3351855d0fa2db7f280fb1e8f8cb1364b9dca2047d24` |
-| GitHub artifact container | `390eeb881e5450d1b98b87e32c8eb30883d927f48e98a4bbbd24cb1e76f8e300` |
+| `Image` | `b03bf02ae6fba1ffa09768d07ce74a6ff990568db248c954b17479e96c95f466` |
+| `AK3_op8_oneplusoss-op8-oos13-1_ksun_susfs-v1.5.5_k4.19.157_r34.zip` | `e4a406e8bd260b7e91ece49ae341ab707362b29924bd3c02653a1b3b57d0617d` |
+| GitHub artifact container | `78e4ac3a2fc1935fb546c276b210fe2cb82e70d91c61e6dcdf8c556598e74beb` |
 
 The downloaded ZIP was revalidated after the run: it contains the non-empty
 `Image`, AnyKernel core, `instantnoodle` device check, active-slot boot
 resolution, and no sample/GKI-only abort rule. Physical-device boot remains
-unverified.
+unverified. See the
+[run verification record](docs/verification/op8-ci-presentation-2026-07-26.md).
 
 ---
 
@@ -188,13 +189,19 @@ For **KSUN_SUSFS**: install a SUSFS userspace module (e.g. [sidex15/susfs4ksu-mo
 
 ### Kernel changes and boot risk
 
+The CI presentation/naming update ending at builder commit `8ba29d1` made
+**no new kernel-source, kernel-patch, defconfig, integration-pin, or toolchain
+change**. It changed workflow validation, output naming, checksums, summaries,
+documentation, and one Git executable-mode bit. The kernel-level rows below
+are the already-existing OP8 integration that the clean run rebuilt.
+
 | Change | Kernel-level effect | Main risk | Current evidence |
 |--------|---------------------|-----------|------------------|
 | OnePlus compatibility set | Repairs invalid prototypes, GSI symbol generation, and RTIC BSS placement without changing the defconfig | Low, but still changes compiled source | Clean STOCK CI baseline passed |
-| KernelSU-Next manual hooks | Hooks exec/open/read/stat, input safe mode, reboot supercall, and the 4.19 unmount path | Medium; a wrong hook placement can panic or break early userspace | Clean GitHub CI compiled and linked the exact OP8 tree |
-| SUSFS v1.5.5 | Changes VFS, mount namespace, proc/fdinfo, stat, uname, and task state paths | Medium to high; OEM-port mistakes can cause boot or runtime faults | Clean GitHub CI compiled `fs/susfs.o` and linked the final Image |
-| Current-KSU/SUSFS bridge | Connects the official SUSFS 4.19 ABI to the current KernelSU-Next layout | Medium; ABI mismatch can break root/SUSFS behavior | Contract tests and clean GitHub compile/link passed |
-| OP8 AnyKernel installer | Replaces the active-slot `boot` kernel only for `instantnoodle` | High if flashed on the wrong ROM/device or without a backup | Downloaded CI ZIP revalidated; no physical-device flash test yet |
+| KernelSU-Next manual hooks | Hooks exec/open/read/stat, input safe mode, reboot supercall, and the 4.19 unmount path | Medium; a wrong hook placement can panic or break early userspace | Clean run `30213621719` compiled and linked the exact OP8 tree |
+| SUSFS v1.5.5 | Changes VFS, mount namespace, proc/fdinfo, stat, uname, and task state paths | Medium to high; OEM-port mistakes can cause boot or runtime faults | Clean run `30213621719` compiled and linked the final Image |
+| Current-KSU/SUSFS bridge | Connects the official SUSFS 4.19 ABI to the current KernelSU-Next layout | Medium; ABI mismatch can break root/SUSFS behavior | Contract tests and clean run `30213621719` passed |
+| OP8 AnyKernel installer | Replaces the active-slot `boot` kernel only for `instantnoodle` | High if flashed on the wrong ROM/device or without a backup | Downloaded run `30213621719` ZIP and SHA sidecar revalidated; no physical-device flash test yet |
 
 Build success proves compilation and package structure, **not** boot safety. Keep a
 known-good stock `boot.img`, verify the installed ROM is OP8 OOS 13.1-compatible,

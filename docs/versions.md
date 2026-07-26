@@ -24,6 +24,22 @@ resolved from their official major tags on 2026-07-26.
 | `actions/download-artifact` | `v4` | `d3f86a106a0bac45b974a628896c90dbdf5c8093` |
 | `softprops/action-gh-release` | `v2` | `3bb12739c298aeb8a4eeaf626c5b8d85266b0e65` |
 
+## Latest clean proof
+
+[Run `30213621719`](https://github.com/mohdakil2426/OnePlus_KernelSU_SUSFS/actions/runs/30213621719)
+rebuilt the immutable OP8 OOS 13.1 `KSUN_SUSFS` request on builder revision
+`8ba29d19acf2dd17a923dd363f7f6b7cdae2574e`. The downloaded outputs were
+independently checked:
+
+| Output | SHA-256 |
+|---|---|
+| `Image` | `b03bf02ae6fba1ffa09768d07ce74a6ff990568db248c954b17479e96c95f466` |
+| AnyKernel ZIP | `e4a406e8bd260b7e91ece49ae341ab707362b29924bd3c02653a1b3b57d0617d` |
+| GitHub artifact container | `78e4ac3a2fc1935fb546c276b210fe2cb82e70d91c61e6dcdf8c556598e74beb` |
+
+This is compile, link, package, and checksum proof. It is not physical-device
+boot proof.
+
 ## Why the Marble pershoot fork is not used
 
 The Marble evidence establishes `pershoot/KernelSU-Next@dev-susfs` as a proven
