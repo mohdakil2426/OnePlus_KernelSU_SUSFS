@@ -9,6 +9,7 @@
 #   KERNEL_SOURCE   git URL (default HELLBOY017)
 #   COMPANION_SOURCE / COMPANION_BRANCH for split official source releases
 #   TOOLCHAIN_PROFILE selected source toolchain (default zyc-clang-14)
+#   SOURCE_PATCH_SET audited compatibility repairs (default none)
 #   DEFCONFIG       default vendor/oplus-stock_defconfig
 #   DEVICE_PROFILE  ALL_OP8_SERIES | OP8 | OP8Pro | OP8T | OP9R
 #   SOURCE_PRESET   label for artifacts
@@ -25,6 +26,7 @@ KERNEL_BRANCH="${KERNEL_BRANCH:?KERNEL_BRANCH is required}"
 COMPANION_SOURCE="${COMPANION_SOURCE:-}"
 COMPANION_BRANCH="${COMPANION_BRANCH:-}"
 TOOLCHAIN_PROFILE="${TOOLCHAIN_PROFILE:-zyc-clang-14}"
+SOURCE_PATCH_SET="${SOURCE_PATCH_SET:-none}"
 BUILD_MODE="${BUILD_MODE:?BUILD_MODE is required}"
 DEFCONFIG="${DEFCONFIG:-vendor/oplus-stock_defconfig}"
 DEVICE_PROFILE="${DEVICE_PROFILE:-ALL_OP8_SERIES}"
@@ -66,6 +68,22 @@ if [[ -n "$COMPANION_SOURCE" || -n "$COMPANION_BRANCH" ]]; then
   mkdir -p "$(dirname "$KERNEL_DIR")"
   git clone --depth=1 -b "$KERNEL_BRANCH" "$KERNEL_SOURCE" "$KERNEL_DIR"
   git clone --depth=1 -b "$COMPANION_BRANCH" "$COMPANION_SOURCE" "$COMPANION_DIR"
+
+  case "$SOURCE_PATCH_SET" in
+    none)
+      ;;
+    oneplusoss-sm8250-strict-prototypes)
+      PATCH_FILE="$ROOT_DIR/patches/oneplusoss-sm8250-strict-prototypes.patch"
+      [[ -f "$PATCH_FILE" ]] || die "source patch not found: $PATCH_FILE"
+      git -C "$COMPANION_DIR" apply --check "$PATCH_FILE"
+      git -C "$COMPANION_DIR" apply "$PATCH_FILE"
+      echo "Applied source patch set: $SOURCE_PATCH_SET"
+      ;;
+    *)
+      die "unknown SOURCE_PATCH_SET=$SOURCE_PATCH_SET"
+      ;;
+  esac
+
   rsync -a "$COMPANION_DIR/vendor/" "$OFFICIAL_LAYOUT/vendor/"
   rsync -a "$COMPANION_DIR/kernel/msm-4.19/" "$KERNEL_DIR/"
   rm -rf "$COMPANION_DIR"
@@ -235,6 +253,7 @@ endgroup
   echo "companion_source=$COMPANION_SOURCE"
   echo "companion_branch=$COMPANION_BRANCH"
   echo "toolchain_profile=$TOOLCHAIN_PROFILE"
+  echo "source_patch_set=$SOURCE_PATCH_SET"
   echo "build_mode=$BUILD_MODE"
   echo "defconfig=$DEFCONFIG"
   echo "device_profile=$DEVICE_PROFILE"

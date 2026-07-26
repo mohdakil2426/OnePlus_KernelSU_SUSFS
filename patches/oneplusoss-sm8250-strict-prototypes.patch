@@ -1,0 +1,26 @@
+diff --git a/kernel/msm-4.19/techpack/display/oplus/oplus_display_panel.c b/kernel/msm-4.19/techpack/display/oplus/oplus_display_panel.c
+index 45d62e6120ce..1dc3f25689d4 100755
+--- a/kernel/msm-4.19/techpack/display/oplus/oplus_display_panel.c
++++ b/kernel/msm-4.19/techpack/display/oplus/oplus_display_panel.c
+@@ -474,7 +474,7 @@ err_class_create:
+ 	return rc;
+ }
+ 
+-void __exit oplus_display_panel_exit()
++void __exit oplus_display_panel_exit(void)
+ {
+ 	pr_info("%s\n", __func__);
+ 
+diff --git a/vendor/oplus/kernel/system/uboot_log/uboot_log.c b/vendor/oplus/kernel/system/uboot_log/uboot_log.c
+index b6e45c3be1ca..4a1d173e7c3b 100644
+--- a/vendor/oplus/kernel/system/uboot_log/uboot_log.c
++++ b/vendor/oplus/kernel/system/uboot_log/uboot_log.c
+@@ -167,7 +167,7 @@ static struct kmsg_dumper kboot_dumper = {
+ /*
+  * Dont printk any log int this thread
+  */
+-int ubootback_thread_fn()
++int ubootback_thread_fn(void *data)
+ {
+ 	size_t line_len = 0;
+ 	u32 idx =0;

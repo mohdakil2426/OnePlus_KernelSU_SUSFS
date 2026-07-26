@@ -2,7 +2,7 @@
 
 ## Scope
 
-This builder lets you select one clean upstream source per manual workflow run:
+This builder lets you select one source preset per manual workflow run:
 
 | Preset | Upstream | Default branch | Defconfig | Device scope |
 |--------|----------|----------------|-----------|--------------|
@@ -23,7 +23,7 @@ This builder lets you select one clean upstream source per manual workflow run:
 
 **Not supported:** OnePlus 9/9 Pro (SM8350), OP7 series, OP10+ GKI devices.
 
-`STOCK` does not alter the selected kernel source or defconfig. `KSUN` and `KSUN_SUSFS` add only KernelSU-Next and SUSFS integration changes.
+Community `STOCK` presets do not alter the selected kernel source or defconfig. Official `ONEPLUSOSS_*` presets apply the audited `oneplusoss-sm8250-strict-prototypes` source patch and are stock-derived; their defconfig remains unchanged. `KSUN` and `KSUN_SUSFS` add only KernelSU-Next and SUSFS integration changes.
 
 Official presets use the same-named branch from both [the kernel repository](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250) and [the companion modules/device-tree repository](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8250). A kernel-only clone is incomplete because its relative symlinks expect the companion `vendor/` and `kernel/msm-4.19/techpack/` trees in the shared source workspace.
 
@@ -49,7 +49,7 @@ Workflow input: select `source_preset`; leave `kernel_branch` empty to use its d
 
 | Mode | Root | SUSFS | Use |
 |------|------|-------|-----|
-| `STOCK` | No | No | Baseline / pure tree |
+| `STOCK` | No | No | Baseline; official presets may include their declared compatibility patch |
 | `KSUN` | KernelSU-Next | No | Root without SUSFS |
 | `KSUN_SUSFS` | KernelSU-Next | Yes (`kernel-4.19`) | Root + hide stack |
 

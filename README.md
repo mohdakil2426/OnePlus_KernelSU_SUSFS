@@ -23,9 +23,9 @@ Build **STOCK**, **KernelSU-Next**, or **KernelSU-Next + SUSFS** kernels for the
 | `ONEPLUSOSS_OP8T_OOS14` | [OnePlusOSS/android_kernel_oneplus_sm8250](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250) | `oneplus/sm8250_u_14.0.0_op8t` | `vendor/kona-perf_defconfig` | OP8T on OOS 14 |
 | `ONEPLUSOSS_OP9R_OOS14` | [OnePlusOSS/android_kernel_oneplus_sm8250](https://github.com/OnePlusOSS/android_kernel_oneplus_sm8250) | `oneplus/sm8250_u_14.0.0_op9r` | `vendor/kona-perf_defconfig` | OP9R on OOS 14 |
 
-`STOCK` builds are clean upstream builds: the builder does not patch source files or rewrite the selected defconfig. `KSUN` and `KSUN_SUSFS` only add the requested KernelSU-Next and SUSFS integrations.
+Community-source `STOCK` builds remain clean upstream builds. Official `ONEPLUSOSS_*` STOCK builds apply the audited `oneplusoss-sm8250-strict-prototypes` compatibility patch, which corrects two invalid function signatures without changing their behavior; their artifacts are therefore stock-derived, not byte-for-byte upstream. The selected defconfig remains unchanged. `KSUN` and `KSUN_SUSFS` add only the requested KernelSU-Next and SUSFS integrations.
 
-The official `ONEPLUSOSS_*` presets compose both matching OnePlus repositories: the kernel tree and `android_kernel_modules_and_devicetree_oneplus_sm8250`. The latter supplies the `vendor/` and `techpack/` targets referenced by the kernel tree's symlinks; this is source assembly, not a kernel patch.
+The official `ONEPLUSOSS_*` presets compose both matching OnePlus repositories: the kernel tree and `android_kernel_modules_and_devicetree_oneplus_sm8250`. The latter supplies the `vendor/` and `techpack/` targets referenced by the kernel tree's symlinks. The builder then applies its declared compatibility patch with `git apply --check`, so upstream drift fails instead of being patched fuzzily.
 
 Those presets also follow the published OnePlus build configuration: Android Clang `r399163b` (11.0.5), `LLVM=1`, and the matching `aarch64-linux-gnu` / `arm-linux-gnueabi` GNU assembler tools. Community presets retain their existing ZyC Clang profile.
 
@@ -39,7 +39,7 @@ This git branch is **not** for OP10+ GKI devices. Upstream multi-device WildKern
 
 | Mode | What you get |
 |------|----------------|
-| **STOCK** | Non-root clean-upstream baseline (no KernelSU / no SUSFS) — HELLBOY `14` verified |
+| **STOCK** | Non-root baseline (no KernelSU / no SUSFS); official presets may declare an audited compatibility patch |
 | **KSUN** | [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) built-in (non-GKI 4.19) |
 | **KSUN_SUSFS** | KSUN + [SUSFS](https://gitlab.com/simonpunk/susfs4ksu) (`kernel-4.19`) |
 
@@ -126,7 +126,8 @@ For **KSUN_SUSFS**: install a SUSFS userspace module (e.g. [sidex15/susfs4ksu-mo
 ## Repo layout (this branch)
 
 ```
-configs/sources.json          # selectable clean upstream source presets
+configs/sources.json          # selectable source and compatibility metadata
+patches/                      # audited source-specific compatibility repairs
 configs/build-request.json    # push-triggered build request
 configs/registry.json         # devices + known HELLBOY branches
 scripts/build.sh              # orchestrator
@@ -151,7 +152,7 @@ scripts/package-anykernel.sh
 
 | Branch | Role |
 |--------|------|
-| **`op8series-sm8250-ksu-susfs`** | **Active development** — OP8 series clean-source builds |
+| **`op8series-sm8250-ksu-susfs`** | **Active development** — OP8 series source-aware builds |
 | **`main`** | **Reference only** — upstream GKI / multi-device pipeline. Do not commit OP8 changes there; copy patterns when needed. |
 
 ---
