@@ -27,6 +27,7 @@ COMPANION_SOURCE="${COMPANION_SOURCE:-}"
 COMPANION_BRANCH="${COMPANION_BRANCH:-}"
 TOOLCHAIN_PROFILE="${TOOLCHAIN_PROFILE:-zyc-clang-14}"
 SOURCE_PATCH_SET="${SOURCE_PATCH_SET:-none}"
+NATIVE_FEATURE_PROFILE=none
 BUILD_MODE="${BUILD_MODE:?BUILD_MODE is required}"
 DEFCONFIG="${DEFCONFIG:-vendor/oplus-stock_defconfig}"
 DEVICE_PROFILE="${DEVICE_PROFILE:-ALL_OP8_SERIES}"
@@ -73,11 +74,15 @@ if [[ -n "$COMPANION_SOURCE" || -n "$COMPANION_BRANCH" ]]; then
     none)
       ;;
     oneplusoss-sm8250-strict-prototypes)
-      PATCH_FILE="$ROOT_DIR/patches/oneplusoss-sm8250-strict-prototypes.patch"
-      [[ -f "$PATCH_FILE" ]] || die "source patch not found: $PATCH_FILE"
-      # OnePlus publishes the display source with mixed CRLF/LF endings.
-      git -C "$COMPANION_DIR" apply --check --ignore-space-change "$PATCH_FILE"
-      git -C "$COMPANION_DIR" apply --ignore-space-change "$PATCH_FILE"
+      KERNEL_PATCH_FILE="$ROOT_DIR/patches/oneplusoss-sm8250-genksyms.patch"
+      COMPANION_PATCH_FILE="$ROOT_DIR/patches/oneplusoss-sm8250-strict-prototypes.patch"
+      [[ -f "$KERNEL_PATCH_FILE" ]] || die "source patch not found: $KERNEL_PATCH_FILE"
+      [[ -f "$COMPANION_PATCH_FILE" ]] || die "source patch not found: $COMPANION_PATCH_FILE"
+      # OnePlus publishes affected sources with mixed CRLF/LF endings.
+      git -C "$KERNEL_DIR" apply --check --ignore-space-change "$KERNEL_PATCH_FILE"
+      git -C "$KERNEL_DIR" apply --ignore-space-change "$KERNEL_PATCH_FILE"
+      git -C "$COMPANION_DIR" apply --check --ignore-space-change "$COMPANION_PATCH_FILE"
+      git -C "$COMPANION_DIR" apply --ignore-space-change "$COMPANION_PATCH_FILE"
       echo "Applied source patch set: $SOURCE_PATCH_SET"
       ;;
     *)
@@ -127,6 +132,32 @@ fi
 
 log "Configure upstream $DEFCONFIG"
 cd "$KERNEL_DIR"
+
+if [[ -n "$COMPANION_SOURCE" ]]; then
+  FEATURE_FILE="$KERNEL_DIR/oplus_native_features.mk"
+  [[ -f "$FEATURE_FILE" ]] || die "official source is missing oplus_native_features.mk"
+
+  FEATURE_COUNT=0
+  while IFS='=' read -r key value; do
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    [[ -n "$value" ]] || continue
+    value="${value%$'\r'}"
+    export "$key=$value"
+    ((FEATURE_COUNT += 1))
+  done < "$FEATURE_FILE"
+
+  (( FEATURE_COUNT > 0 )) || die "no native features found in $FEATURE_FILE"
+  for required_feature in \
+    OPLUS_FEATURE_PADL_STATISTICS \
+    OPLUS_FEATURE_PROCESS_RECLAIM \
+    OPLUS_FEATURE_UFSPLUS
+  do
+    [[ -v "$required_feature" && -n "${!required_feature}" ]] ||
+      die "required native feature is missing: $required_feature"
+  done
+  NATIVE_FEATURE_PROFILE=oneplus-published
+  echo "Loaded $FEATURE_COUNT published OnePlus native feature values"
+fi
 
 # Prefer clang if present; wrap with ccache unless CLEAN_BUILD (author pattern)
 export ARCH=arm64
@@ -255,6 +286,7 @@ endgroup
   echo "companion_branch=$COMPANION_BRANCH"
   echo "toolchain_profile=$TOOLCHAIN_PROFILE"
   echo "source_patch_set=$SOURCE_PATCH_SET"
+  echo "native_feature_profile=$NATIVE_FEATURE_PROFILE"
   echo "build_mode=$BUILD_MODE"
   echo "defconfig=$DEFCONFIG"
   echo "device_profile=$DEVICE_PROFILE"
